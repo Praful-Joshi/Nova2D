@@ -7,7 +7,7 @@
 // This is the Phase 1 milestone — proves the loop, clock, and renderer work.
 class TestGame : public Nova::Engine {
 public:
-    TestGame() : Nova::Engine({"Nova2D — Phase 1", 1280, 720}) {}
+    TestGame() : Nova::Engine({"Nova2D - Phase 1", 1280, 720}) {}
 
 protected:
     void onFixedUpdate() override {

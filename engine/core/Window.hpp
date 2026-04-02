@@ -17,6 +17,7 @@ struct WindowConfig {
 
 class Window {
 public:
+    // Takes window config and creates an SDL window with the config.
     explicit Window(const WindowConfig& cfg);
     ~Window();
 
