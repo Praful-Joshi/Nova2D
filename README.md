@@ -6,10 +6,6 @@ Built as a graduate course project, now being actively developed toward professi
 > **Status:** Early development — core loop, rendering, physics, and networking work.
 > Actively being refactored and extended.
 
-<p align="center">
-  <img src="preview.gif" alt="Gameplay Preview" />
-</p>
-
 ---
 
 ## Features
