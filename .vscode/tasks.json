@@ -21,7 +21,7 @@
     {
       "label": "Run",
       "type": "shell",
-      "command": "./build/main masterPeer",
+      "command": "./build/bin/nova2d_game masterPeer",
       "group": { "kind": "test", "isDefault": true },
       "presentation": { "reveal": "always", "panel": "shared" },
       "problemMatcher": [],
@@ -42,6 +42,15 @@
       "group": "build",
       "presentation": { "reveal": "always", "panel": "shared" },
       "problemMatcher": []
-    }
+    },
+    {
+      "label": "Run Tests",
+      "type": "shell",
+      "command": "./build/bin/nova2d_tests",
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": [],
+      "dependsOn": "Build"
+    },
   ]
 }

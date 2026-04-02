@@ -6,10 +6,6 @@ Built as a graduate course project, now being actively developed toward professi
 > **Status:** Early development — core loop, rendering, physics, and networking work.
 > Actively being refactored and extended.
 
-<p align="center">
-  <img src="preview.gif" alt="Gameplay Preview" />
-</p>
-
 ---
 
 ## Features
@@ -26,28 +22,35 @@ Built as a graduate course project, now being actively developed toward professi
 
 ## Roadmap
 
-- [ ] Entity Component System (ECS) refactor
-- [ ] Sprite and texture rendering
-- [ ] Scene management
-- [ ] Tilemap support
-- [ ] Asset manager
-- [ ] Box2D physics integration
-- [ ] Lua scripting layer
-- [ ] Dear ImGui debug overlay
+- [x] Phase 1 — Foundation
+      CMakeLists restructure → Math → Logger → Clock → Window → Bouncing rectangle demo <p align="center"> <img src="docs/images/phase1.gif" width="500"> </p>
+- [ ] Phase 2 — ECS Core
+      Entity/Registry/ComponentPool → Transform + Sprite components → RenderSystem renders textures
+- [ ] Phase 3 — Input & Events
+      InputManager → ActionMap → EventBus → game responds to keyboard
+- [ ] Phase 4 — Physics & Collision
+      RigidBody + Collider → Box2D integration → CollisionSystem → CollisionEvent firing
+- [ ] Phase 5 — Scene System
+      Scene → SceneManager → SceneSerializer (JSON) → push/pop scenes
+- [ ] Phase 6 — Lighting
+      Light component → LightMap render target → LightingSystem compositor
+- [ ] Phase 7 — Networking
+      NetworkSync component → NetworkSystem → port existing ZMQ peer code
+- [ ] Phase 9 — Tools
+      Dear ImGui debug overlay → entity inspector → scene editor
 
 ---
 
 ## Project Structure
 ```
-2D-Game-Engine/
-├── include/              # All engine headers
-├── src/
-│   ├── core/             # Entity, EventManager, Game loop, Timeline
-│   ├── handlers/         # Collision, Control, Death, SideBoundary handlers
-│   ├── modules/          # Gravity, Movement, Platform, Spawnpoint, SideBoundary
-│   ├── networking/       # Peer-to-peer via ZeroMQ
-│   └── rendering/        # SDL2 renderer + dynamic scaling
-├── main.cpp              # Sample game entry point (Bubble Shooter)
+Nova2D/
+├── engine/
+│   ├── core/             # Engine, Window, Clock, Logger
+│   ├── math/             # Math, Rect, Vec2
+├── game/
+│   ├── main.cpp          # Actual game script that references Engine
+├── tests/
+│   ├── math/             # All tests for engine/math 
 ├── CMakeLists.txt        # Cross-platform build system
 ├── .clang-format         # Code style (Google C++ style, 4-space indent)
 └── .vscode/              # VS Code tasks, settings, extension recommendations
@@ -55,9 +58,7 @@ Built as a graduate course project, now being actively developed toward professi
 
 ---
 
-## Building & Running
-
-### Prerequisites
+## Prerequisites
 
 | Dependency | Version | macOS | Linux (apt) | Windows |
 |---|---|---|---|---|
@@ -68,49 +69,29 @@ Built as a graduate course project, now being actively developed toward professi
 | cppzmq | any | `brew install cppzmq` | `sudo apt install libcppzmq-dev` | `vcpkg install cppzmq` |
 | Boost | 1.70+ | `brew install boost` | `sudo apt install libboost-dev` | `vcpkg install boost` |
 
-### macOS & Linux
+## Build & Run
+
+**First time setup (run once):**
 ```bash
-git clone https://github.com/Praful-Joshi/2D-Game-Engine.git
-cd 2D-Game-Engine
-mkdir build && cd build
-cmake ..
-cmake --build . -j$(nproc 2>/dev/null || sysctl -n hw.logicalcpu)
-./main masterPeer
+# macOS / Linux
+./scripts/setup.sh
+
+# Windows (PowerShell as Administrator)
+powershell -ExecutionPolicy Bypass -File scripts/setup.ps1
 ```
 
-### Windows (with vcpkg)
-```powershell
-git clone https://github.com/Praful-Joshi/2D-Game-Engine.git
-cd 2D-Game-Engine
-
-# Install dependencies via vcpkg
-vcpkg install sdl2 zeromq cppzmq boost
-
-mkdir build && cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=path\to\vcpkg\scripts\buildsystems\vcpkg.cmake
-cmake --build . --config Release
-.\Release\main.exe masterPeer
+**Every build after that:**
+```bash
+cmake -B build
+cmake --build build -j$(nproc 2>/dev/null || sysctl -n hw.logicalcpu)
+./build/bin/nova2d_game
 ```
 
 ### VS Code
 
 Open the repo folder — you'll be prompted to install recommended extensions.
-- **Build:** `Cmd/Ctrl+Shift+B`
-- **Build & Run:** `Cmd/Ctrl+Shift+P` → "Tasks: Run Test Task"
-
----
-
-## Controls (Bubble Shooter)
-
-| Key | Action |
-|---|---|
-| Arrow Keys | Move player |
-| Spacebar | Shoot |
-| P | Pause / unpause |
-| T | Toggle scaling mode |
-| 1 / 2 / 3 | Change game speed |
-| S + H | Shrink player temporarily |
-| Double-tap arrow | Quick teleport |
+- **Build:** `Cmd/Ctrl+Shift+P` → "Task: Run Tasks - Build"
+- **Build & Run:** `Cmd/Ctrl+Shift+P` → "Task: Run Tasks - Run"
 
 ---
 

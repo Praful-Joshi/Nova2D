@@ -1,0 +1,10 @@
+{
+  "name": "nova2d",
+  "version": "0.1.0",
+  "dependencies": [
+    "sdl2",
+    "sdl2-image",
+    "spdlog",
+    "catch2"
+  ]
+}
