@@ -94,20 +94,6 @@ Open the repo folder — you'll be prompted to install recommended extensions.
 
 ---
 
-## Controls (Bubble Shooter)
-
-| Key | Action |
-|---|---|
-| Arrow Keys | Move player |
-| Spacebar | Shoot |
-| P | Pause / unpause |
-| T | Toggle scaling mode |
-| 1 / 2 / 3 | Change game speed |
-| S + H | Shrink player temporarily |
-| Double-tap arrow | Quick teleport |
-
----
-
 ## Contributing
 
 1. Fork the repo and create a feature branch: `git checkout -b feature/your-feature`
