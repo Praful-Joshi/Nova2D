@@ -37,8 +37,7 @@ TagPeer::TagPeer(const TagConfig& config) : TagPeer(config, nullptr) {}
 TagPeer::TagPeer(const TagConfig& config, std::shared_ptr<Transport> transport)
     : config_(config),
       timeline_([this] { return nowNs_; }),
-      game_(CONTROL_SPEED, GRAVITY, config.windowWidth, config.windowHeight, config.peerId, false,
-            config.players),
+      game_(CONTROL_SPEED, GRAVITY, config.windowWidth, config.windowHeight, config.peerId),
       network_(config.peerId, std::move(transport)),
       rounds_(timeline_),
       roundHandler_(*this),
@@ -61,9 +60,15 @@ void TagPeer::tick(const Keys& keys, int64_t elapsedNs) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     nowNs_ += elapsedNs;
     const std::vector<Message> messages = network_.receive(game_, nowNs_);
-    // Departures first, so a new Host's messages that arrive alongside are followed
-    for (int departed : network_.departures()) onPeerDeparted(departed);
+    // The old Host's last messages count, then a new Host's ones that arrived alongside
+    const int hostBefore = hostId_;
     for (const Message& message : messages) handleMessage(message);
+    for (int departed : network_.departures()) onPeerDeparted(departed);
+    if (hostId_ != hostBefore) {
+        for (const Message& message : messages) {
+            if (message.sender == hostId_) handleMessage(message);
+        }
+    }
     // Once everyone expected has joined, send only changed state. It stays on if a Peer
     // leaves; a Peer that (re)joins is sent full state when first heard.
     if (static_cast<int>(presentPeers().size()) >= config_.players) {
@@ -101,8 +106,14 @@ void TagPeer::requestFullState() {
 }
 
 void TagPeer::handleMessage(const Message& message) {
+    if (const auto* state = std::get_if<HostState>(&message.body)) {
+        if (message.sender != hostId_ && isHostAhead(message.sender, *state)) {
+            changeHost(message.sender);  // e.g. joining after Host Migration
+        }
+    }
     // Only the Host has authority over shared state
     if (message.sender != hostId_) return;
+    hostHeard_ = true;
 
     if (const auto* state = std::get_if<HostState>(&message.body)) {
         followHost(*state);
@@ -125,8 +136,15 @@ void TagPeer::handleMessage(const Message& message) {
 void TagPeer::onPeerDeparted(int peerId) {
     if (peerId != hostId_) return;
     // Host Migration: a role change, continuing from the last HOST_STATE this Peer followed
-    hostId_ = presentPeers().front();
-    hostChangedAtNs_ = nowNs_;
+    changeHost(presentPeers().front());
+}
+
+void TagPeer::changeHost(int newHostId) {
+    if (newHostId == hostId_) return;
+    hostId_ = newHostId;
+    // Announce it only if this Peer was following another Host, not when it has just joined
+    if (hostHeard_) hostChangedAtNs_ = nowNs_;
+    hostHeard_ = isHost();
     network_.forceFullState();  // the new Host's full state, and everyone's player again
 }
 
@@ -183,7 +201,18 @@ void TagPeer::startRound(int round, const std::vector<int>& participants) {
     network_.send(RoundStart{round, participants, it});
 }
 
+bool TagPeer::isHostAhead(int sender, const HostState& state) const {
+    // Another Peer is acting as Host. Follow it if its Round is further on than this Peer's;
+    // when they're level, if this Peer can't hear its Host, or the lower Peer ID wins.
+    const int order = rounds_.compare(state.round, state.phase);
+    if (order != 0) return order > 0;
+    const std::vector<int> present = presentPeers();
+    const bool hostPresent = std::binary_search(present.begin(), present.end(), hostId_);
+    return !hostPresent || sender < hostId_;
+}
+
 void TagPeer::endRound() {
+    accountItTime();  // the Round may end early, between the Host's usual accounting
     raiseRoundEvent(ROUND_END, rounds_.round(), rounds_.participants());
     network_.send(RoundEnd{rounds_.round(), tagging::itTimes(game_, rounds_.participants())});
 }

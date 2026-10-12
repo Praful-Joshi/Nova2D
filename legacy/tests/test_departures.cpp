@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include "message.hpp"
 #include "mesh.hpp"
 
 using namespace mesh;
@@ -177,4 +178,61 @@ TEST_CASE("Every Peer shows who is now Host, and a Round after Host Migration pl
         REQUIRE(peer->itPeerId() == rest[0]->itPeerId());
         REQUIRE(peer->itPeerId() != 0);
     }
+}
+
+TEST_CASE("A Peer that joins after Host Migration follows the new Host", "[legacy][departures]") {
+    ThreePeers peers(seedWhereFirstItIs(false));
+    peers.peer1->leave();
+    const std::vector<TagPeer*> rest = peers.without(1);
+    tickAll(rest, 2);
+
+    auto peer4 = joinPeer(peers.network, 4, 3);
+    std::vector<TagPeer*> all{peers.peer2.get(), peers.peer3.get(), peer4.get()};
+    tickAll(all, TICKS_PER_SECOND);
+
+    REQUIRE(peer4->hostId() == 2);
+    REQUIRE_FALSE(peer4->isHost());
+    REQUIRE(peer4->rounds().phase() == RoundPhase::PLAYING);
+    REQUIRE(peer4->rounds().isSpectator(4));
+}
+
+TEST_CASE("A former Host that rejoins doesn't take the Host role back", "[legacy][departures]") {
+    ThreePeers peers(seedWhereFirstItIs(false));
+    const int round = peers.peer2->rounds().round();
+    peers.peer1->leave();
+    const std::vector<TagPeer*> rest = peers.without(1);
+    tickAll(rest, 2);
+
+    auto rejoined = joinPeer(peers.network, 1, 3);
+    std::vector<TagPeer*> all{peers.peer2.get(), peers.peer3.get(), rejoined.get()};
+    tickAll(all, TICKS_PER_SECOND);
+
+    for (TagPeer* peer : all) REQUIRE(peer->hostId() == 2);
+    REQUIRE_FALSE(rejoined->isHost());
+    REQUIRE(rejoined->rounds().round() == round);
+    REQUIRE(rejoined->rounds().phase() == RoundPhase::PLAYING);
+}
+
+TEST_CASE("After Host Migration the new Host sends its full state and every Peer resends its "
+          "player",
+          "[legacy][departures]") {
+    ThreePeers peers(seedWhereFirstItIs(false));
+    InMemoryTransport observer(peers.network);
+    const std::vector<TagPeer*> rest = peers.without(1);
+    tickAll(peers.all(), 3 * TICKS_PER_SECOND);  // everyone has stopped moving
+    observer.receive();
+
+    peers.peer1->leave();
+    tickAll(rest, 3);
+
+    bool hostState = false;
+    bool player3 = false;
+    for (const auto& raw : observer.receive()) {
+        auto message = decodeMessage(raw);
+        if (!message) continue;
+        if (message->sender == 2 && message->type() == MessageType::HOST_STATE) hostState = true;
+        if (message->sender == 3 && message->type() == MessageType::PLAYER_STATE) player3 = true;
+    }
+    REQUIRE(hostState);
+    REQUIRE(player3);
 }

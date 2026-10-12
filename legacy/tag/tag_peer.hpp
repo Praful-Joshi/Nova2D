@@ -136,6 +136,7 @@ private:
     RoundHandler roundHandler_;
     int hostId_ = 1;
     int64_t hostChangedAtNs_ = -1;  // real time of the last Host Migration
+    bool hostHeard_ = false;        // this Peer has followed (or been) the current Host
     int64_t nextHostStateNs_ = 0;
     std::mt19937 random_;
     // Host: Playing time already added to someone's It time this Round
@@ -151,6 +152,10 @@ private:
 
     // A Peer left or timed out: the lowest remaining Peer takes over as Host if needed
     void onPeerDeparted(int peerId);
+    // Hands the Host role to another Peer, as this Peer sees it
+    void changeHost(int newHostId);
+    // Whether another Peer broadcasting HOST_STATE should be followed as Host instead
+    [[nodiscard]] bool isHostAhead(int sender, const HostState& state) const;
     // Host only: starts and ends Rounds and broadcasts shared state
     void runHost();
     void startRound(int round, const std::vector<int>& participants);
