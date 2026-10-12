@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include "arena.hpp"
+#include "hud.hpp"
 #include "init.hpp"
 #include "input.hpp"
 #include "minimap.hpp"
@@ -65,6 +67,8 @@ int main(int argc, char* argv[]) {
 
         clearScreen(renderer);
         renderEntities(renderer, peer.game());
+        hud::drawAbilityBars(renderer, peer.game(), arena::playerEntityId(peer.peerId()),
+                             static_cast<int>(peer.game().getCamera().getX()));
         minimap::draw(renderer, peer.game());
         // HUD placeholder, in screen space
         drawText(renderer, "TAG", 16, 16, 4, SDL_Color{255, 255, 255, 255});

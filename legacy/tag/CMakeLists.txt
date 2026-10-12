@@ -2,6 +2,7 @@
 # exactly the way nova2d_tag does.
 add_library(nova2d_tag_core STATIC
     arena.cpp
+    hud.cpp
     minimap.cpp
     tag_peer.cpp
 )
