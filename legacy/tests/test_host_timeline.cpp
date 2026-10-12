@@ -6,6 +6,7 @@
 
 #include "mesh.hpp"
 #include "message.hpp"
+#include "timeline_hud.hpp"
 
 using namespace mesh;
 
@@ -226,4 +227,20 @@ TEST_CASE("A game paused for longer than the heartbeat timeout keeps every Peer"
     REQUIRE(peers.other->connectedPeers() == std::vector<int>{1});
     REQUIRE(playerOf(*peers.host, 2) != nullptr);
     REQUIRE(playerOf(*peers.other, 1) != nullptr);
+}
+
+TEST_CASE("Peers that aren't Host are told the Host paused the game; the Host is told it's "
+          "paused",
+          "[legacy][host-timeline]") {
+    REQUIRE(hud::pauseNotice(true, false) == "PAUSED BY HOST");
+    REQUIRE(hud::pauseNotice(true, true) == "PAUSED");
+    REQUIRE(hud::pauseNotice(false, false).empty());
+    REQUIRE(hud::pauseNotice(false, true).empty());
+}
+
+TEST_CASE("The speed badge shows the game speed, and nothing at normal speed",
+          "[legacy][host-timeline]") {
+    REQUIRE(hud::speedBadge(DOUBLE_SPEED_TIC) == "2\xC3\x97");
+    REQUIRE(hud::speedBadge(HALF_SPEED_TIC) == "0.5\xC3\x97");
+    REQUIRE(hud::speedBadge(NORMAL_TIC).empty());
 }

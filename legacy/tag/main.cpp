@@ -17,6 +17,7 @@
 #include "scaling.hpp"
 #include "tag_args.hpp"
 #include "tag_peer.hpp"
+#include "timeline_hud.hpp"
 #include "zmq_transport.hpp"
 
 namespace {
@@ -112,6 +113,7 @@ int main(int argc, char* argv[]) {
                                  static_cast<int>(peer.game().getCamera().getX()));
             minimap::draw(renderer, peer.game());
             hud::drawRoundHud(renderer, peer);
+            hud::drawTimelineHud(renderer, peer);
         }
         if (screenshotPath != nullptr && ++frame == screenshotFrame) {
             saveFrame(renderer, screenshotPath);

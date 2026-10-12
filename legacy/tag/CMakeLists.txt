@@ -10,6 +10,7 @@ add_library(nova2d_tag_core STATIC
     tag_args.cpp
     tag_network.cpp
     tag_peer.cpp
+    timeline_hud.cpp
 )
 
 target_include_directories(nova2d_tag_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
