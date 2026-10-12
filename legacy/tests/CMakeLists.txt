@@ -5,6 +5,7 @@ add_executable(nova2d_legacy_tests
     test_messages.cpp
     test_network.cpp
     test_physics.cpp
+    test_tag_args.cpp
     test_text.cpp
 )
 

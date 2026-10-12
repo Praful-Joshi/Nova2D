@@ -1,6 +1,11 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
 
 #include "arena.hpp"
 #include "hud.hpp"
@@ -9,8 +14,10 @@
 #include "minimap.hpp"
 #include "render.hpp"
 #include "scaling.hpp"
+#include "tag_args.hpp"
 #include "tag_peer.hpp"
 #include "text.hpp"
+#include "zmq_transport.hpp"
 
 namespace {
 
@@ -27,22 +34,54 @@ void saveFrame(SDL_Renderer* renderer, const char* path) {
     SDL_FreeSurface(surface);
 }
 
+// Joins the mesh: binds this Peer's port and subscribes to every other Peer
+std::shared_ptr<Transport> connectToPeers(const TagConfig& config) {
+    std::map<int, std::string> otherPeers;
+    for (int id = 1; id <= arena::MAX_PLAYERS; ++id) {
+        if (id != config.peerId) otherPeers[id] = config.peerAddress(id);
+    }
+    try {
+        return std::make_shared<ZmqTransport>(config.peerId, otherPeers);
+    } catch (const zmq::error_t& error) {
+        std::cerr << "Can't listen on port " << ZmqTransport::port(config.peerId) << ": "
+                  << error.what() << " (is another Peer already using --id " << config.peerId
+                  << "?)\n";
+        return nullptr;
+    }
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
-    // If set, save a screenshot of the game after about one second, then quit
+    const TagArgs args = parseTagArgs(argc, argv);
+    if (args.helpRequested) {
+        std::cout << tagUsage();
+        return 0;
+    }
+    if (!args.error.empty()) {
+        std::cerr << "nova2d_tag: " << args.error << "\n" << tagUsage();
+        return 2;
+    }
+    const TagConfig& config = args.config;
+
+    // If set, save a screenshot of the game after about one second (or the given number of
+    // frames), then quit
     const char* screenshotPath = std::getenv("NOVA2D_TAG_SCREENSHOT");
+    const char* screenshotFrames = std::getenv("NOVA2D_TAG_SCREENSHOT_FRAMES");
+    const int screenshotFrame = screenshotFrames != nullptr ? std::atoi(screenshotFrames) : 60;
     int frame = 0;
 
-    TagConfig config;
+    auto transport = connectToPeers(config);
+    if (!transport) return 1;
 
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
-    if (!init(window, renderer, "Nova2D - Tag", config.windowWidth, config.windowHeight)) {
+    const std::string title = "Nova2D - Tag (Peer " + std::to_string(config.peerId) + ")";
+    if (!init(window, renderer, title.c_str(), config.windowWidth, config.windowHeight)) {
         return 1;
     }
 
-    TagPeer peer(config);
+    TagPeer peer(config, transport);
 
     using Clock = std::chrono::steady_clock;
     constexpr auto FRAME = std::chrono::nanoseconds(TagPeer::TICK_NS);
@@ -66,14 +105,17 @@ int main(int argc, char* argv[]) {
         peer.tick(Keys::fromKeyboard(), elapsedNs);
 
         clearScreen(renderer);
-        renderEntities(renderer, peer.game());
-        hud::drawAbilityBars(renderer, peer.game(), arena::playerEntityId(peer.peerId()),
-                             static_cast<int>(peer.game().getCamera().getX()));
-        minimap::draw(renderer, peer.game());
+        {
+            std::lock_guard<std::mutex> lock(peer.stateMutex());
+            renderEntities(renderer, peer.game());
+            hud::drawAbilityBars(renderer, peer.game(), arena::playerEntityId(peer.peerId()),
+                                 static_cast<int>(peer.game().getCamera().getX()));
+            minimap::draw(renderer, peer.game());
+        }
         // HUD placeholder, in screen space
         drawText(renderer, "TAG", 16, 16, 4, SDL_Color{255, 255, 255, 255});
         drawText(renderer, "NOVA2D LEGACY ENGINE", 16, 52, 2, SDL_Color{255, 255, 255, 255});
-        if (screenshotPath != nullptr && ++frame == 60) {
+        if (screenshotPath != nullptr && ++frame == screenshotFrame) {
             saveFrame(renderer, screenshotPath);
             quit = true;
         }
@@ -86,6 +128,9 @@ int main(int argc, char* argv[]) {
                 std::chrono::duration_cast<std::chrono::milliseconds>(FRAME - frameTime).count()));
         }
     }
+
+    // A clean quit: the other Peers remove this player at once
+    peer.leave();
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
