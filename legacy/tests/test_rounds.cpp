@@ -119,6 +119,7 @@ TEST_CASE("Players are placed at their SpawnPoints and held still during the Cou
 
     REQUIRE(tickUntil(both, [&] { return allIn(both, RoundPhase::PLAYING); },
                       3 * TICKS_PER_SECOND) >= 0);
+    tickAll(both, 2 * TICKS_PER_SECOND + 6);  // past It's 2 s freeze, if Peer 1 is It
     for (int i = 0; i < 30; ++i) {
         peer1->tick(Keys{SDL_SCANCODE_RIGHT});
         peer2->tick(Keys{});

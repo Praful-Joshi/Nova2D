@@ -18,7 +18,8 @@ namespace hud {
 std::string formatRoundTime(int64_t remainingMs);
 
 // Draws the Round's screen-space HUD: this Peer's ID and the Round, the Lobby list, the 3-2-1
-// Countdown, the Round timer, the Results screen and the Spectator notice
+// Countdown, the Round timer and who is It, the Results screen (each player's It time and the
+// winner) and the Spectator notice
 void drawRoundHud(SDL_Renderer* renderer, TagPeer& peer);
 
 }  // namespace hud

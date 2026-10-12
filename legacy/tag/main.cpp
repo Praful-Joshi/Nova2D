@@ -12,6 +12,7 @@
 #include "init.hpp"
 #include "input.hpp"
 #include "minimap.hpp"
+#include "player_effects.hpp"
 #include "render.hpp"
 #include "round_hud.hpp"
 #include "scaling.hpp"
@@ -109,9 +110,10 @@ int main(int argc, char* argv[]) {
         {
             std::lock_guard<std::mutex> lock(peer.stateMutex());
             renderEntities(renderer, peer.game());
+            hud::drawPlayerEffects(renderer, peer);
             hud::drawAbilityBars(renderer, peer.game(), arena::playerEntityId(peer.peerId()),
                                  static_cast<int>(peer.game().getCamera().getX()));
-            minimap::draw(renderer, peer.game());
+            minimap::draw(renderer, peer.game(), hud::tagMarkerStyle(peer));
             hud::drawRoundHud(renderer, peer);
             hud::drawTimelineHud(renderer, peer);
         }

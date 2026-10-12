@@ -1,5 +1,6 @@
 #include "round_hud.hpp"
 
+#include <algorithm>
 #include <vector>
 
 #include "arena.hpp"
@@ -12,6 +13,7 @@ namespace {
 constexpr SDL_Color WHITE{255, 255, 255, 255};
 constexpr SDL_Color SHADOW{0, 0, 40, 255};
 constexpr SDL_Color HIGHLIGHT{255, 220, 80, 255};
+constexpr SDL_Color IT_RED{240, 60, 60, 255};
 
 // Text with a drop shadow so it reads against any background
 void drawLabel(SDL_Renderer* renderer, const std::string& text, int x, int y, int scale,
@@ -49,6 +51,60 @@ void drawLobby(SDL_Renderer* renderer, TagPeer& peer, int centreX, int top) {
     }
 }
 
+// Seconds to one decimal place, e.g. "42.5 S"
+std::string formatItTime(int64_t ms) {
+    const int64_t tenths = (ms + 50) / 100;
+    return std::to_string(tenths / 10) + "." + std::to_string(tenths % 10) + " S";
+}
+
+// Who is It, top left, and whether this Peer's player has Tag-back Immunity
+void drawWhoIsIt(SDL_Renderer* renderer, TagPeer& peer, int y) {
+    const int it = peer.itPeerId();
+    if (it == 0) return;
+    if (it == peer.peerId()) {
+        drawLabel(renderer, peer.isFrozen(it) ? "YOU ARE IT - FROZEN" : "YOU ARE IT", 16, y, 2,
+                  IT_RED);
+    } else {
+        drawLabel(renderer, "PEER " + std::to_string(it) + " IS IT", 16, y, 2, IT_RED);
+    }
+    if (peer.isImmune(peer.peerId())) {
+        drawLabel(renderer, "TAG-BACK IMMUNE", 16, y + 24, 2, HIGHLIGHT);
+    }
+}
+
+// Each participant's It time and the winner: the least time as It
+void drawResults(SDL_Renderer* renderer, TagPeer& peer, int centreX, int top) {
+    drawCentred(renderer, "ROUND OVER", centreX, top, 6);
+    const std::vector<int> winners = peer.winners();
+    const auto isWinner = [&winners](int id) {
+        return std::find(winners.begin(), winners.end(), id) != winners.end();
+    };
+
+    int y = top + 64;
+    drawCentred(renderer, "TIME AS IT", centreX, y, 2);
+    y += 30;
+    for (const ItTime& itTime : peer.itTimes()) {
+        const int id = itTime.peerId;
+        std::string line = "PEER " + std::to_string(id) + "   " + formatItTime(itTime.ms);
+        if (id == peer.peerId()) line += " - YOU";
+        drawCentred(renderer, line, centreX, y, 3,
+                    isWinner(id) ? HIGHLIGHT : arena::playerColor(id));
+        y += 30;
+    }
+
+    if (winners.size() == 1) {
+        const bool you = winners.front() == peer.peerId();
+        drawCentred(renderer,
+                    you ? "YOU WIN!" : "PEER " + std::to_string(winners.front()) + " WINS!",
+                    centreX, y + 10, 4, HIGHLIGHT);
+    } else if (winners.size() > 1) {
+        drawCentred(renderer, "DRAW!", centreX, y + 10, 4, HIGHLIGHT);
+    }
+    drawCentred(renderer,
+                "NEXT ROUND IN " + std::to_string((peer.rounds().remainingMs() + 999) / 1000),
+                centreX, y + 60, 2);
+}
+
 }  // namespace
 
 std::string formatRoundTime(int64_t remainingMs) {
@@ -84,12 +140,10 @@ void drawRoundHud(SDL_Renderer* renderer, TagPeer& peer) {
         case RoundPhase::PLAYING:
             drawLabel(renderer, formatRoundTime(rounds.remainingMs()),
                       width - 16 - textWidth("0:00", 4), 16, 4);
+            drawWhoIsIt(renderer, peer, 64);
             break;
         case RoundPhase::RESULTS:
-            drawCentred(renderer, "ROUND OVER", centreX, height / 4, 6);
-            drawCentred(renderer,
-                        "NEXT ROUND IN " + std::to_string((rounds.remainingMs() + 999) / 1000),
-                        centreX, height / 4 + 70, 2);
+            drawResults(renderer, peer, centreX, height / 4);
             break;
     }
 

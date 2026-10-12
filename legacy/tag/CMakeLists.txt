@@ -5,11 +5,13 @@ add_library(nova2d_tag_core STATIC
     hud.cpp
     message.cpp
     minimap.cpp
+    player_effects.cpp
     round_hud.cpp
     rounds.cpp
     tag_args.cpp
     tag_network.cpp
     tag_peer.cpp
+    tagging.cpp
     timeline_hud.cpp
 )
 

@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -80,9 +81,29 @@ public:
     // This Peer and the Peers it can hear, ascending
     [[nodiscard]] std::vector<int> presentPeers() const;
 
-    // Custom Events Tag raises for Round changes, on every Peer
+    // The chase as this Peer sees it (the Host's decisions; see tagging.hpp)
+    // Peer ID of It, or 0 if nobody is
+    [[nodiscard]] int itPeerId() const;
+    // Whether the player can't move: It at the start of Playing
+    bool isFrozen(int peerId);
+    // Whether the player has Tag-back Immunity against It, having just tagged them
+    bool isImmune(int peerId);
+    // The player's time as It this Round, in Timeline ms; final once the Round is over
+    [[nodiscard]] int64_t itTimeMs(int peerId) const;
+    // Each participant's It time, leaving out any who have left
+    [[nodiscard]] std::vector<ItTime> itTimes() const;
+    // The participants with the least It time so far: the winners once the Round is over
+    [[nodiscard]] std::vector<int> winners() const;
+    // Seeds the Host's random choices, such as who starts as It (random unless seeded)
+    void seedRandom(unsigned seed) { random_.seed(seed); }
+    // Host only, inside tick(): makes a random participant who is still here It, frozen for
+    // 2 s, e.g. when It leaves. HOST_STATE tells the other Peers.
+    void reassignIt();
+
+    // Custom Events Tag raises for Round changes and Taggings, on every Peer
     static constexpr const char* ROUND_START = "ROUND_START";
     static constexpr const char* ROUND_END = "ROUND_END";
+    static constexpr const char* TAGGED = "TAGGED";
 
 private:
     // Applies Tag's Custom Events to this Peer
@@ -111,6 +132,11 @@ private:
     RoundHandler roundHandler_;
     int hostId_ = 1;
     int64_t nextHostStateNs_ = 0;
+    std::mt19937 random_;
+    // Host: Playing time already added to someone's It time this Round
+    int64_t itAccountedMs_ = 0;
+    // Whether applyRoles() blocked the local player's dash and shrink
+    bool abilitiesBlockedByRoles_ = false;
 
     // True on the tick a key goes down, so holding a key acts once
     bool pressed(const Keys& keys, SDL_Scancode key) const;
@@ -125,11 +151,20 @@ private:
     void sendHostStateDue();
     // Follows the Host's broadcast state
     void followHost(const HostState& state);
-    void raiseRoundEvent(const char* name, int round, const std::vector<int>& participants);
+    void raiseRoundEvent(const char* name, int round, const std::vector<int>& participants,
+                         int it = 0);
     void onRoundEvent(const Event& event);
+    // Host, while Playing: adds the time since the last call to It's It time, then decides
+    // whether It is touching someone
+    void runTagging();
+    void accountItTime();
+    void raiseTagged(int from, int to);
+    // A random one of the given Peers
+    int pickRandom(const std::vector<int>& peerIds);
     // Puts the local player at its SpawnPoint, ready to play
     void placeAtSpawn();
-    // Applies each player's part in the Round: frozen in the Countdown, hidden if spectating
+    // Applies each player's part in the Round: frozen in the Countdown (and It for 2 s more),
+    // hidden if spectating, no dash or shrink while frozen or Tag-back Immune
     void applyRoles();
 };
 

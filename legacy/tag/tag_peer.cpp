@@ -7,6 +7,7 @@
 #include "control.hpp"
 #include "platform.hpp"
 #include "tag_player.hpp"
+#include "tagging.hpp"
 
 namespace {
 constexpr double GRAVITY = 0.002;  // pixels per Timeline unit squared
@@ -40,7 +41,8 @@ TagPeer::TagPeer(const TagConfig& config, std::shared_ptr<Transport> transport)
             config.players),
       network_(config.peerId, std::move(transport)),
       rounds_(timeline_),
-      roundHandler_(*this) {
+      roundHandler_(*this),
+      random_(std::random_device{}()) {
     game_.setTimeline(timeline_);
     game_.setEventManager(events_);
     events_.registerHandler(EventType::COLLISION, &collisionHandler_);
@@ -49,6 +51,7 @@ TagPeer::TagPeer(const TagConfig& config, std::shared_ptr<Transport> transport)
     events_.registerHandler(EventType::SIDEBOUNDARY, &sideBoundaryHandler_);
     events_.registerHandler(ROUND_START, &roundHandler_);
     events_.registerHandler(ROUND_END, &roundHandler_);
+    events_.registerHandler(TAGGED, &roundHandler_);
 
     arena::build(game_);
     arena::addPlayer(game_, config_.peerId, true);
@@ -104,12 +107,15 @@ void TagPeer::handleMessage(const Message& message) {
         applyTimelineState(timeline_, *timeline);
     } else if (const auto* start = std::get_if<RoundStart>(&message.body)) {
         if (rounds_.compare(start->round, RoundPhase::COUNTDOWN) > 0) {
-            raiseRoundEvent(ROUND_START, start->round, start->participants);
+            raiseRoundEvent(ROUND_START, start->round, start->participants, start->it);
         }
     } else if (const auto* end = std::get_if<RoundEnd>(&message.body)) {
         if (rounds_.compare(end->round, RoundPhase::RESULTS) > 0) {
+            tagging::setItTimes(game_, end->itTimes);  // the final totals
             raiseRoundEvent(ROUND_END, end->round, rounds_.participants());
         }
+    } else if (const auto* tagged = std::get_if<Tagged>(&message.body)) {
+        raiseTagged(tagged->from, tagged->to);
     }
 }
 
@@ -126,6 +132,7 @@ void TagPeer::runHost() {
         case RoundPhase::COUNTDOWN:
             break;  // every Peer runs the Countdown's clock itself
         case RoundPhase::PLAYING:
+            runTagging();
             if (rounds_.isTimeUp()) endRound();
             break;
         case RoundPhase::RESULTS:
@@ -134,6 +141,7 @@ void TagPeer::runHost() {
                     startRound(rounds_.round() + 1, present);
                 } else {
                     rounds_.enter(RoundPhase::LOBBY, rounds_.round(), {}, 0);
+                    tagging::reset(game_);
                 }
             }
             break;
@@ -141,13 +149,87 @@ void TagPeer::runHost() {
 }
 
 void TagPeer::startRound(int round, const std::vector<int>& participants) {
-    raiseRoundEvent(ROUND_START, round, participants);
-    network_.send(RoundStart{round, participants});
+    const int it = pickRandom(participants);
+    raiseRoundEvent(ROUND_START, round, participants, it);
+    network_.send(RoundStart{round, participants, it});
 }
 
 void TagPeer::endRound() {
     raiseRoundEvent(ROUND_END, rounds_.round(), rounds_.participants());
-    network_.send(RoundEnd{rounds_.round()});
+    network_.send(RoundEnd{rounds_.round(), tagging::itTimes(game_, rounds_.participants())});
+}
+
+void TagPeer::runTagging() {
+    accountItTime();
+    const int it = tagging::it(game_);
+    const int touched = tagging::findTagging(game_, rounds_.participants(), timeline_.getTime());
+    if (touched == 0) return;
+    raiseTagged(it, touched);
+    network_.send(Tagged{it, touched});
+}
+
+void TagPeer::accountItTime() {
+    if (rounds_.phase() != RoundPhase::PLAYING) return;
+    // Counting Playing time already elapsed, so the totals add up to the Round's length
+    const int64_t elapsedMs = Rounds::PLAYING_MS - rounds_.remainingMs();
+    if (elapsedMs <= itAccountedMs_) return;
+    if (auto it = tagging::playerTag(game_, tagging::it(game_))) {
+        it->itTimeMs += elapsedMs - itAccountedMs_;
+    }
+    itAccountedMs_ = elapsedMs;
+}
+
+void TagPeer::raiseTagged(int from, int to) {
+    Event event = Event::custom(TAGGED, EventContext{&game_, nullptr}, 0,
+                                static_cast<unsigned long long>(timeline_.getTime()));
+    event.set("from", from);
+    event.set("to", to);
+    events_.raise(event);
+}
+
+int TagPeer::pickRandom(const std::vector<int>& peerIds) {
+    if (peerIds.empty()) return 0;
+    std::uniform_int_distribution<std::size_t> index(0, peerIds.size() - 1);
+    return peerIds[index(random_)];
+}
+
+void TagPeer::reassignIt() {
+    const RoundPhase phase = rounds_.phase();
+    if (!isHost() || (phase != RoundPhase::COUNTDOWN && phase != RoundPhase::PLAYING)) return;
+    std::vector<int> remaining;
+    for (int id : rounds_.participants()) {
+        if (tagging::playerTag(game_, id)) remaining.push_back(id);
+    }
+    accountItTime();  // the time so far was the old It's
+    // In the Countdown, the freeze starts when Playing does, as at the start of a Round
+    const int64_t freezeFrom =
+        timeline_.getTime() + (phase == RoundPhase::COUNTDOWN ? rounds_.remainingMs() : 0);
+    tagging::makeIt(game_, pickRandom(remaining), freezeFrom + tagging::IT_FREEZE_MS);
+}
+
+int TagPeer::itPeerId() const { return tagging::it(game_); }
+
+bool TagPeer::isFrozen(int peerId) {
+    auto tag = tagging::playerTag(game_, peerId);
+    return tag && tag->isFrozen(timeline_.getTime());
+}
+
+bool TagPeer::isImmune(int peerId) {
+    auto tag = tagging::playerTag(game_, peerId);
+    return tag && tag->isImmune(timeline_.getTime());
+}
+
+int64_t TagPeer::itTimeMs(int peerId) const {
+    auto tag = tagging::playerTag(game_, peerId);
+    return tag ? tag->itTimeMs : 0;
+}
+
+std::vector<ItTime> TagPeer::itTimes() const {
+    return tagging::itTimes(game_, rounds_.participants());
+}
+
+std::vector<int> TagPeer::winners() const {
+    return tagging::winners(game_, rounds_.participants());
 }
 
 void TagPeer::sendHostStateDue() {
@@ -169,6 +251,7 @@ void TagPeer::sendHostStateDue() {
     }
     std::sort(state.platforms.begin(), state.platforms.end(),
               [](const PlatformState& a, const PlatformState& b) { return a.id < b.id; });
+    tagging::writeHostState(game_, rounds_.participants(), timeline_.getTime(), state);
     network_.sendState(state);
 }
 
@@ -190,22 +273,43 @@ void TagPeer::followHost(const HostState& state) {
     } else if (order == 0 && state.phase != RoundPhase::LOBBY) {
         rounds_.setRemainingMs(state.remainingMs);
     }
+
+    if (rounds_.compare(state.round, state.phase) == 0) {
+        tagging::followHostState(game_, state, timeline_.getTime());
+        // So that if this Peer becomes Host, It time carries on from the Host's totals
+        if (state.phase == RoundPhase::PLAYING) {
+            itAccountedMs_ = Rounds::PLAYING_MS - state.remainingMs;
+        }
+    }
 }
 
-void TagPeer::raiseRoundEvent(const char* name, int round, const std::vector<int>& participants) {
+void TagPeer::raiseRoundEvent(const char* name, int round, const std::vector<int>& participants,
+                              int it) {
     Event event = Event::custom(name, EventContext{&game_, nullptr}, 0,
                                 static_cast<unsigned long long>(timeline_.getTime()));
     event.set("round", round);
     event.set("participants", joinPeerIds(participants));
+    event.set("it", it);
     events_.raise(event);
 }
 
 void TagPeer::onRoundEvent(const Event& event) {
+    if (event.name() == TAGGED) {
+        tagging::tag(game_, event.getInt("from"), event.getInt("to"),
+                     timeline_.getTime() + tagging::IMMUNITY_MS);
+        return;
+    }
+
     const int round = event.getInt("round");
     const std::vector<int> participants = splitPeerIds(event.getString("participants"));
     if (event.name() == ROUND_START) {
         rounds_.enter(RoundPhase::COUNTDOWN, round, participants, Rounds::COUNTDOWN_MS);
         if (!rounds_.isSpectator(config_.peerId)) placeAtSpawn();
+        // It's 2 s freeze starts when Playing does, giving the others a head start
+        tagging::reset(game_);
+        tagging::makeIt(game_, event.getInt("it"),
+                        timeline_.getTime() + Rounds::COUNTDOWN_MS + tagging::IT_FREEZE_MS);
+        itAccountedMs_ = 0;
         network_.forceFullState();  // so Spectators and new players have complete state
     } else if (event.name() == ROUND_END) {
         rounds_.enter(RoundPhase::RESULTS, round, participants, Rounds::RESULTS_MS);
@@ -236,7 +340,14 @@ void TagPeer::applyRoles() {
         if (spectator) player->setActive(false);
         if (auto control = game_.getAttribute<ControlAttribute>(Property::Control,
                                                                  player->getEntityID())) {
-            control->setFrozen(spectator || rounds_.phase() == RoundPhase::COUNTDOWN);
+            const int64_t now = timeline_.getTime();
+            const bool frozen = spectator || rounds_.phase() == RoundPhase::COUNTDOWN ||
+                                (tag && tag->isFrozen(now));
+            control->setFrozen(frozen);
+            // Changed only when the Round's block starts or ends, leaving other blocks alone
+            const bool blocked = frozen || (tag && tag->isImmune(now));
+            if (blocked != abilitiesBlockedByRoles_) control->setAbilitiesBlocked(blocked);
+            abilitiesBlockedByRoles_ = blocked;
         }
     }
 }
