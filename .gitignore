@@ -40,3 +40,6 @@ personal_docs
 
 # vcpkg on Windows
 vcpkg_installed/
+
+# Claude Code agent worktrees
+.claude/worktrees/
