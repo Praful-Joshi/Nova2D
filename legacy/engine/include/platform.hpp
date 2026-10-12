@@ -16,17 +16,22 @@ public:
           directionX(1),
           directionY(1) {}  // Default direction is forward
 
-    // Override the movement methods for platform-specific logic
-    void update(int64_t delta_time);
+    // Moves the platform along its axis for delta_time, turning around at its limits.
+    // Horizontal when endX > startX, vertical when endY > startY.
+    void update(double delta_time);
     // Platform-specific getters and setters
     [[nodiscard]] int getStartX() const { return startX; }
     [[nodiscard]] int getEndX() const { return endX; }
     [[nodiscard]] int getStartY() const { return startY; }
     [[nodiscard]] int getEndY() const { return endY; }
+    // How far the platform moved in its last update, so riders can move with it
+    [[nodiscard]] double getLastDeltaX() const { return lastDeltaX; }
+    [[nodiscard]] double getLastDeltaY() const { return lastDeltaY; }
 
 private:
     int startX, endX, startY, endY;  // Start and end positions for the platform's movement
     int directionX, directionY;      // Direction of movement (+1 or -1)
+    double lastDeltaX = 0, lastDeltaY = 0;
 };
 
 #endif

@@ -43,6 +43,8 @@ public:
         gravityStrength = gravity;
         cur_w = curW;
         cur_h = curH;
+        base_w = curW;
+        base_h = curH;
         useEfficientCommunication = useEfficientComm;
         noPlayersJoining = noplayersJoining;
     }
@@ -72,6 +74,10 @@ public:
     double getGravityStrength() const { return gravityStrength; }
     void setGravityStrength(double gravity) { gravityStrength = gravity; }
 
+    // Window size the game was designed for; proportional scaling scales from it
+    int getBaseWidth() const { return base_w; }
+    int getBaseHeight() const { return base_h; }
+
     int getCurrentWidth() const { return cur_w; }
     void setCurrentWidth(int width) { cur_w = width; }
 
@@ -91,10 +97,25 @@ public:
     // Runs one frame of every Property, in a fixed order, processing the events they raise
     void update();
 
+    // Longest physics step, in Timeline units; longer frames are split into equal substeps
+    static constexpr double MAX_STEP = 8.0;
+    // Longest frame simulated, in Timeline units, so a stall doesn't launch everything
+    static constexpr int64_t MAX_FRAME = 100;
+
     EventManager* getEventManager() const { return eventManager; }
     void setEventManager(EventManager& eventMgr) { eventManager = &eventMgr; }
 
     void addProperty(Property propertyType, int entityId, std::shared_ptr<Attribute> attribute);
+
+    // The Entity's Attribute for a Property, or nullptr if it has none of that type
+    template <typename T>
+    std::shared_ptr<T> getAttribute(Property propertyType, int entityId) const {
+        auto propertyIt = properties.find(propertyType);
+        if (propertyIt == properties.end()) return nullptr;
+        auto it = propertyIt->second.find(entityId);
+        if (it == propertyIt->second.end()) return nullptr;
+        return std::dynamic_pointer_cast<T>(it->second);
+    }
     void updateProperties(Property propertyType, Timeline* timeline);
 
     // void updateEntitySizes(ScalingMode scalingMode, std::unordered_map<Entity*, SDL_Rect>
@@ -142,11 +163,13 @@ private:
     int cur_w;
     // current window height
     int cur_h;
+    int base_w;
+    int base_h;
 
     std::unordered_map<int, SDL_Rect> originalPositions;
 
     // timeline
-    Timeline* timeline;
+    Timeline* timeline = nullptr;
 
     bool isProportionalScaling = false;  // Track current scaling mode
 
@@ -160,8 +183,11 @@ private:
     int noPlayersJoining = 0;
     bool didAllPlayersJoin = false;
 
-    EventManager* eventManager;
+    EventManager* eventManager = nullptr;
     Keys input;
+
+    // Moves entities standing on moving platforms along with them
+    void carryRiders();
     // Client Sockets
     // zmq::context_t context;
     // zmq::socket_t  publisher;

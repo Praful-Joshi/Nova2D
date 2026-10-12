@@ -3,9 +3,9 @@
 
 #include "entity.hpp"
 
-enum class ScalingMode { ConstantSize, Proportional };
+class Game;
 
-void updateWindowSize(SDL_Window* window, int cur_w, int cur_h);
+// Copies the window's current size into the game, for proportional scaling
+void updateWindowSize(SDL_Window* window, Game& game);
 
 #endif
-void updateWindowSize(SDL_Window* window, int cur_w, int cur_h);

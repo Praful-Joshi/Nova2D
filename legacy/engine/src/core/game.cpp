@@ -1,10 +1,13 @@
 #include "game.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <mutex>
 #include <utility>
 
 #include "eventmanager.hpp"
 #include "peer.hpp"
+#include "platform.hpp"
 
 struct EntityState {
     int x, y, width, height, clientID;
@@ -15,8 +18,9 @@ struct EntityState {
 std::unordered_map<int, EntityState> previousEntityStates;
 
 void Game::addEntity(const std::shared_ptr<Entity>& entity) {
-    int entityID = entity->getEntityID();  // Assuming Entity has this method
-    entities[entityID] = entity;           // Store the entity by its ID
+    // A new entity's time step starts now
+    if (timeline != nullptr) entity->startClock(timeline->getTime());
+    entities[entity->getEntityID()] = entity;
 }
 
 void Game::updatePreviousEntityStates(Game& game) {
@@ -53,18 +57,43 @@ void Game::updateProperties(Property propertyType, Timeline* timeline) {
 }
 
 void Game::update() {
+    // Each entity's own time step since its last frame
+    const int64_t now = timeline->getTime();
+    int64_t longestFrame = 0;
+    for (const auto& [id, entity] : entities) {
+        const int64_t frame = std::min(entity->beginFrame(now), MAX_FRAME);
+        entity->setDeltaTime(static_cast<double>(frame));
+        longestFrame = std::max(longestFrame, frame);
+    }
+
     updateProperties(Property::Control, timeline);
     eventManager->processEvents();
 
-    updateProperties(Property::Move, timeline);
-    updateProperties(Property::Gravity, timeline);
-
-    updateProperties(Property::Collide, timeline);
-    eventManager->processEvents();
+    // Physics in equal substeps so fast movement can't pass through thin solids
+    const int steps = std::max(1, static_cast<int>(std::ceil(longestFrame / MAX_STEP)));
+    for (int step = 0; step < steps; ++step) {
+        for (const auto& [id, entity] : entities) {
+            const double frame = static_cast<double>(std::min(entity->getFrameDelta(), MAX_FRAME));
+            entity->setDeltaTime(frame / steps);
+        }
+        updateProperties(Property::Move, timeline);
+        carryRiders();
+        updateProperties(Property::Gravity, timeline);
+        updateProperties(Property::Collide, timeline);
+        eventManager->processEvents();
+    }
 
     updateProperties(Property::DeathZone, timeline);
     updateProperties(Property::SideBoundary, timeline);
     eventManager->processEvents();
+}
+
+void Game::carryRiders() {
+    for (const auto& [id, entity] : entities) {
+        if (!entity->isGrounded()) continue;
+        auto platform = std::dynamic_pointer_cast<Platform>(getEntity(entity->getGroundEntityId()));
+        if (platform) entity->moveBy(platform->getLastDeltaX(), platform->getLastDeltaY());
+    }
 }
 
 std::shared_ptr<Entity> Game::getEntity(const int& GUID) {

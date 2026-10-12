@@ -5,6 +5,7 @@
 #include "init.hpp"
 #include "input.hpp"
 #include "render.hpp"
+#include "scaling.hpp"
 #include "tag_peer.hpp"
 
 namespace {
@@ -49,6 +50,9 @@ int main(int argc, char* argv[]) {
         while (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_QUIT) quit = true;
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) quit = true;
+            if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+                updateWindowSize(window, peer.game());
+            }
         }
 
         const auto now = Clock::now();

@@ -48,6 +48,11 @@ private:
     DeathHandler deathHandler_;
     SideBoundaryHandler sideBoundaryHandler_;
     Game game_;
+    Keys previousKeys_;
+
+    // True on the tick a key goes down, so holding a key acts once
+    bool pressed(const Keys& keys, SDL_Scancode key) const;
+    void handlePeerKeys(const Keys& keys);
 };
 
 #endif

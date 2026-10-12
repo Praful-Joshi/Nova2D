@@ -6,6 +6,8 @@
 #endif
 #include <cstring>
 
+#include "control.hpp"
+
 void ControlHandler::onEvent(const Event& event) {
     if (event.type == EventType::CONTROL) {
         updateGameState(*event.context.entity, *event.context.game);
@@ -14,23 +16,14 @@ void ControlHandler::onEvent(const Event& event) {
 
 void ControlHandler::updateGameState(Entity& entity, Game& game) {
     const Keys& keys = game.getInput();
+    auto control = game.getAttribute<ControlAttribute>(Property::Control, entity.getEntityID());
+    if (!control) return;
 
-    Timeline* timeline = game.getTimeline();
-    int64_t elapsed_time = timeline->getTime();
-    static int64_t last_time = elapsed_time;
+    const int64_t elapsed_time = game.getTimeline()->getTime();
 
-    // Calculate delta time since last frame
-    int64_t delta_time = elapsed_time - last_time;
-    last_time = elapsed_time;
-
-    // Retrieve gravity attribute from property-centric structure
-    auto gravityAttr = entity.getHasGravity();
-    bool hasGravity = gravityAttr;
-
-    // Define keys of interest
-    SDL_Scancode keysOfInterest[] = {SDL_SCANCODE_UP,    SDL_SCANCODE_DOWN, SDL_SCANCODE_LEFT,
-                                     SDL_SCANCODE_RIGHT, SDL_SCANCODE_T,    SDL_SCANCODE_P,
-                                     SDL_SCANCODE_1,     SDL_SCANCODE_2,    SDL_SCANCODE_3};
+    // Movement and ability keys, tracked for double-tap sequences
+    const SDL_Scancode keysOfInterest[] = {SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_LEFT,
+                                           SDL_SCANCODE_RIGHT};
 
     // Process key presses and releases
     for (SDL_Scancode key : keysOfInterest) {
@@ -39,65 +32,34 @@ void ControlHandler::updateGameState(Entity& entity, Game& game) {
 
         if (!wasPressed && isPressed) {
             // Key was just pressed
-            keySequence.push_back(
-                {key, static_cast<Uint32>(elapsed_time / 1000)});  // Convert to milliseconds
+            keySequence.push_back({key, static_cast<Uint32>(elapsed_time)});
             if (entity.getisMovable() && entity.getIsControllable())
-                checkForSequences(key, static_cast<Uint32>(elapsed_time / 1000), entity, game);
-        }
-
-        if (wasPressed && !isPressed) {
-            // Key was just released (if needed, handle key releases here)
+                checkForSequences(key, static_cast<Uint32>(elapsed_time), entity, game);
         }
     }
 
-    // Handle movement based on current key states and properties
-    if (!hasGravity) {
-        if (keys.held(SDL_SCANCODE_UP)) {
-            entity.setRectY(entity.getRect().y - entity.getVelocityY() * delta_time);
+    // Run while left or right is held
+    double velocityX = 0;
+    if (keys.held(SDL_SCANCODE_LEFT)) velocityX -= control->getRunSpeed();
+    if (keys.held(SDL_SCANCODE_RIGHT)) velocityX += control->getRunSpeed();
+    entity.setVelocityX(velocityX);
+
+    if (entity.getHasGravity()) {
+        // Jump only while standing on something
+        if (keys.held(SDL_SCANCODE_UP) && entity.isGrounded()) {
+            entity.setVelocityY(-control->getJumpSpeed());
+            entity.setGrounded(false);
         }
-        if (keys.held(SDL_SCANCODE_DOWN)) {
-            entity.setRectY(entity.getRect().y + entity.getVelocityY() * delta_time);
-        }
-    }
-    if (keys.held(SDL_SCANCODE_LEFT)) {
-        entity.setRectX(entity.getRect().x - entity.getVelocityX() * delta_time);
-    }
-    if (keys.held(SDL_SCANCODE_RIGHT)) {
-        entity.setRectX(entity.getRect().x + entity.getVelocityX() * delta_time);
-    }
-
-    // Jumping logic when gravity is applied
-    if (hasGravity && keys.held(SDL_SCANCODE_UP) && entity.getVelocityY() == 0) {
-        entity.setVelocityY(-5.0f);  // Set a jump velocity
-    }
-
-    // Check for scaling mode toggle
-    if (keys.held(SDL_SCANCODE_T)) {
-        game.toggleScalingMode();
-    }
-
-    // Pause game if 'P' is pressed
-    if (keys.held(SDL_SCANCODE_P)) {
-        if (timeline->isPaused()) {
-            timeline->unpause();
-        } else {
-            timeline->pause();
-        }
-    }
-
-    // Speed change based on key press
-    if (keys.held(SDL_SCANCODE_1)) {
-        timeline->changeTic(500'000);  // Double speed
-    }
-    if (keys.held(SDL_SCANCODE_2)) {
-        timeline->changeTic(1'000'000);  // Normal speed
-    }
-    if (keys.held(SDL_SCANCODE_3)) {
-        timeline->changeTic(2'000'000);  // Half speed
+    } else {
+        // Without gravity, up and down move freely
+        double velocityY = 0;
+        if (keys.held(SDL_SCANCODE_UP)) velocityY -= control->getRunSpeed();
+        if (keys.held(SDL_SCANCODE_DOWN)) velocityY += control->getRunSpeed();
+        entity.setVelocityY(velocityY);
     }
 
     // Check for chords
-    checkForChords(keys, entity, game, static_cast<Uint32>(elapsed_time / 1000));
+    checkForChords(keys, entity, game, static_cast<Uint32>(elapsed_time));
 
     // Remember this frame's keys for edge detection next frame
     for (SDL_Scancode key : keysOfInterest) previousKeyStates[key] = keys.held(key);
@@ -106,7 +68,7 @@ void ControlHandler::updateGameState(Entity& entity, Game& game) {
 // Helper function to check for chords (simultaneous key presses)
 void ControlHandler::checkForChords(const Keys& keys, Entity& entity, Game& game,
                                     Uint32 timestamp) {
-    Uint32 currentTime = SDL_GetTicks();  // Get current time in milliseconds
+    const Uint32 currentTime = timestamp;  // Timeline time
 
     // pressing 'S' and 'H' together triggers the shrink mechanic
     if (keys.held(SDL_SCANCODE_S) && keys.held(SDL_SCANCODE_H)) {

@@ -1,8 +1,11 @@
 #include "scaling.hpp"
 
-/**
- *   Updates windows size to current width and height
- */
-void updateWindowSize(SDL_Window* window, int cur_w, int cur_h) {
-    SDL_GetWindowSize(window, &cur_w, &cur_h);
+#include "game.hpp"
+
+void updateWindowSize(SDL_Window* window, Game& game) {
+    int width = 0;
+    int height = 0;
+    SDL_GetWindowSize(window, &width, &height);
+    game.setCurrentWidth(width);
+    game.setCurrentHeight(height);
 }
