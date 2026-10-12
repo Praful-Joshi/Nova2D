@@ -49,6 +49,11 @@ install_macos() {
     install_or_upgrade_brew sdl2
     install_or_upgrade_brew spdlog
     install_or_upgrade_brew catch2
+
+    # Legacy Engine (Tag) dependencies: networking and JSON (Boost is used headers-only)
+    install_or_upgrade_brew zeromq
+    install_or_upgrade_brew cppzmq
+    install_or_upgrade_brew boost
 }
 
 # ── Install on Linux ──────────────────────────────────────────────────────────
@@ -80,6 +85,10 @@ https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" \
     # ── SDL2: apt version is fine ─────────────────────────────────────────────
     info "Installing SDL2..."
     sudo apt-get install -y libsdl2-dev
+
+    # ── Legacy Engine (Tag) dependencies: ZeroMQ, cppzmq, Boost headers ──────
+    info "Installing ZeroMQ, cppzmq and Boost..."
+    sudo apt-get install -y libzmq3-dev cppzmq-dev libboost-dev
 
     # ── spdlog: apt version lacks CMake config — build from source ────────────
     SPDLOG_INSTALLED=$(pkg-config --modversion spdlog 2>/dev/null || echo "0.0.0")
@@ -146,4 +155,5 @@ echo ""
 echo "    cmake -B build"
 echo "    cmake --build build -j\$(nproc)"
 echo "    ./build/bin/nova2d_game"
+echo "    ./build/bin/nova2d_tag        # Legacy Engine showcase"
 echo ""

@@ -21,11 +21,6 @@ public:
 
     void processEvents();
 
-    void replayEvents(Game& game);
-
-    bool isRecording = false, isReplaying = false;
-    std::priority_queue<Event, std::vector<Event>, std::less<>> replayEventQueue;
-
 private:
     std::map<EventType, std::list<EventHandler*>> handlers;
     std::priority_queue<Event, std::vector<Event>, std::less<>> eventQueue;

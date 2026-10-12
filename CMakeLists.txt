@@ -31,3 +31,9 @@ add_subdirectory(game)
 
 enable_testing()
 add_subdirectory(tests)
+
+# The Legacy Engine and Tag need ZeroMQ, cppzmq and Boost. CI turns this off.
+option(NOVA2D_BUILD_LEGACY "Build the Legacy Engine, Tag and the legacy tests" ON)
+if(NOVA2D_BUILD_LEGACY)
+    add_subdirectory(legacy)
+endif()

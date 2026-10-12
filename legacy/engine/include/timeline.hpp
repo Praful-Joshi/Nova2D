@@ -6,13 +6,29 @@
 #else
 #include <SDL.h>
 #endif
-#include <stdio.h>
 
-#include <sstream>
-#include <string>
-#include <vector>
+#include <cstdint>
+#include <functional>
 
 class Timeline {
+public:
+    // A source of real time in nanoseconds
+    using Clock = std::function<int64_t()>;
+
+    // Root timeline driven by the given clock (the system clock by default)
+    explicit Timeline(Clock clock, int64_t tic = 1'000'000);
+    // Timeline anchored to another timeline
+    Timeline(Timeline* anchor, int64_t tic);
+    Timeline();
+
+    int64_t getTime();
+    int64_t getCurrentTime();
+    void pause();
+    void unpause();
+    void changeTic(int64_t newTic);
+    bool isPaused() const;
+    int64_t getTic() const { return tic; }
+
 private:
     int64_t start_time;
     int64_t elapsed_paused_time;
@@ -20,16 +36,7 @@ private:
     int64_t tic;
     bool paused = false;
     Timeline* anchor;
-
-public:
-    Timeline(Timeline* anchor, int64_t tic);
-    Timeline();
-    int64_t getTime();
-    int64_t getCurrentTime();
-    void pause();
-    void unpause();
-    void changeTic(int64_t newTic);
-    bool isPaused() const;
+    Clock clock;
 };
 
 #endif

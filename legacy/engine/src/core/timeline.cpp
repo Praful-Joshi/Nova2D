@@ -1,25 +1,40 @@
 #include "timeline.hpp"
 
 #include <chrono>
-#include <mutex>
+#include <utility>
 
-Timeline::Timeline(Timeline* anchor, int64_t tic)
-    : elapsed_paused_time(0), last_paused_time(0), tic(tic), paused(false), anchor(anchor) {
+namespace {
+int64_t systemNanoseconds() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+}  // namespace
+
+Timeline::Timeline(Clock clock, int64_t tic)
+    : elapsed_paused_time(0),
+      last_paused_time(0),
+      tic(tic),
+      paused(false),
+      anchor(nullptr),
+      clock(std::move(clock)) {
     start_time = getCurrentTime();
 }
 
-Timeline::Timeline() : Timeline(nullptr, 1'000'000) {}  // Default constructor
+Timeline::Timeline(Timeline* anchor, int64_t tic)
+    : elapsed_paused_time(0), last_paused_time(0), tic(tic), paused(false), anchor(anchor) {
+    if (anchor == nullptr) clock = systemNanoseconds;
+    start_time = getCurrentTime();
+}
+
+Timeline::Timeline() : Timeline(Clock(systemNanoseconds)) {}
 
 int64_t Timeline::getCurrentTime() {
     if (anchor != nullptr) {
         // Get current time from the anchor timeline
         return anchor->getCurrentTime();
-    } else {
-        // Get current time from the system clock (steady_clock)
-        return std::chrono::duration_cast<std::chrono::nanoseconds>(
-                   std::chrono::steady_clock::now().time_since_epoch())
-            .count();
     }
+    return clock();
 }
 
 int64_t Timeline::getTime() {

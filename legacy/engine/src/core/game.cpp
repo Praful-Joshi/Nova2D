@@ -3,6 +3,7 @@
 #include <mutex>
 #include <utility>
 
+#include "eventmanager.hpp"
 #include "peer.hpp"
 
 struct EntityState {
@@ -49,6 +50,21 @@ void Game::updateProperties(Property propertyType, Timeline* timeline) {
             }
         }
     }
+}
+
+void Game::update() {
+    updateProperties(Property::Control, timeline);
+    eventManager->processEvents();
+
+    updateProperties(Property::Move, timeline);
+    updateProperties(Property::Gravity, timeline);
+
+    updateProperties(Property::Collide, timeline);
+    eventManager->processEvents();
+
+    updateProperties(Property::DeathZone, timeline);
+    updateProperties(Property::SideBoundary, timeline);
+    eventManager->processEvents();
 }
 
 std::shared_ptr<Entity> Game::getEntity(const int& GUID) {

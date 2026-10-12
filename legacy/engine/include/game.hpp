@@ -27,6 +27,7 @@
 #include "collisions.hpp"
 #include "control.hpp"
 #include "gravity.hpp"
+#include "input.hpp"
 #include "movement.hpp"
 #include "peer.hpp"
 #include "scaling.hpp"
@@ -83,6 +84,13 @@ public:
     bool getIsProportionalScaling() const { return isProportionalScaling; };
     void toggleScalingMode() { isProportionalScaling = !isProportionalScaling; };
 
+    // Keys held during the current tick
+    const Keys& getInput() const { return input; }
+    void setInput(const Keys& keys) { input = keys; }
+
+    // Runs one frame of every Property, in a fixed order, processing the events they raise
+    void update();
+
     EventManager* getEventManager() const { return eventManager; }
     void setEventManager(EventManager& eventMgr) { eventManager = &eventMgr; }
 
@@ -115,7 +123,6 @@ public:
 
     // current client ID
     const int ClientID;
-    std::vector<SDL_Scancode> keysPressed;
 
 private:
     // List of entities
@@ -154,6 +161,7 @@ private:
     bool didAllPlayersJoin = false;
 
     EventManager* eventManager;
+    Keys input;
     // Client Sockets
     // zmq::context_t context;
     // zmq::socket_t  publisher;

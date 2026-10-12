@@ -7,4 +7,4 @@
 #include <iostream>
 
 // Initialize SDL rendering window
-bool init(SDL_Window*& window, SDL_Renderer*& renderer);
+bool init(SDL_Window*& window, SDL_Renderer*& renderer, const char* title, int width, int height);
