@@ -181,3 +181,32 @@ TEST_CASE("A Peer without a transport plays offline", "[legacy][network]") {
     REQUIRE(peer.connectedPeers().empty());
     REQUIRE(peer.localPlayer() != nullptr);
 }
+
+TEST_CASE("A player respawning from a pit is hidden on other Peers, then reappears without "
+          "streaking across the arena",
+          "[legacy][network]") {
+    InMemoryNetwork network;
+    auto peer1 = joinPeer(network, 1);
+    auto peer2 = joinPeer(network, 2);
+    tickAll({peer1.get(), peer2.get()}, TICKS_PER_SECOND);
+
+    // Peer 2's player drops into pit 1; its SpawnPoint is at the far right of the arena
+    peer2->localPlayer()->setPosition(arena::PIT1_LEFT + 80, arena::GROUND_TOP);
+
+    bool seenHidden = false;
+    bool seenBetween = false;
+    for (int i = 0; i < 3 * TICKS_PER_SECOND; ++i) {
+        tickAll({peer2.get(), peer1.get()}, 1);
+        auto remote = playerOf(*peer1, 2);
+        if (!remote->isActive()) seenHidden = true;
+        const double x = remote->getX();
+        if (remote->isActive() && x > arena::PIT1_RIGHT && x < arena::PIT2_RIGHT) {
+            seenBetween = true;  // drawn part-way between the pit and the SpawnPoint
+        }
+    }
+
+    REQUIRE(seenHidden);
+    REQUIRE_FALSE(seenBetween);
+    REQUIRE(playerOf(*peer1, 2)->isActive());
+    REQUIRE(playerOf(*peer1, 2)->getX() == peer2->localPlayer()->getX());
+}

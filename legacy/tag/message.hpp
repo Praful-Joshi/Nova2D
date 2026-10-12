@@ -25,10 +25,12 @@ struct PlayerState {
     int height = 0;
     double velocityX = 0;
     double velocityY = 0;
+    bool active = true;  // false while hidden, e.g. waiting to respawn after a DeathZone
 
     bool operator==(const PlayerState& other) const {
         return x == other.x && y == other.y && width == other.width && height == other.height &&
-               velocityX == other.velocityX && velocityY == other.velocityY;
+               velocityX == other.velocityX && velocityY == other.velocityY &&
+               active == other.active;
     }
 };
 

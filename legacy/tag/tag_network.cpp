@@ -20,6 +20,7 @@ void place(Entity& player, const PlayerState& state) {
     player.setRectHeight(state.height);
     player.setVelocityX(state.velocityX);
     player.setVelocityY(state.velocityY);
+    player.setActive(state.active);
 }
 
 }  // namespace
@@ -77,6 +78,11 @@ void TagNetwork::interpolate(Game& game, int64_t nowNs) {
             continue;
         }
         const Snapshot& to = snapshots[1];
+        if (!from.state.active || !to.state.active) {
+            // Hiding or respawning is a jump, not movement: don't slide across the arena
+            place(*player, from.state);
+            continue;
+        }
         const double t = static_cast<double>(renderNs - from.receivedNs) /
                          static_cast<double>(to.receivedNs - from.receivedNs);
         PlayerState between = from.state;
@@ -91,7 +97,7 @@ void TagNetwork::sendDue(const Entity* localPlayer, int64_t nowNs) {
     if (localPlayer != nullptr && nowNs >= nextStateNs_) {
         send(PlayerState{localPlayer->getX(), localPlayer->getY(), localPlayer->getRect().w,
                          localPlayer->getRect().h, localPlayer->getVelocityX(),
-                         localPlayer->getVelocityY()});
+                         localPlayer->getVelocityY(), localPlayer->isActive()});
         nextStateNs_ = nextDue(nextStateNs_, STATE_INTERVAL_NS, nowNs);
     }
     if (nowNs >= nextHeartbeatNs_) {

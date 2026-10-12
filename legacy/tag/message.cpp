@@ -28,6 +28,7 @@ void writeBody(pt::ptree& tree, const PlayerState& state) {
     tree.put("height", state.height);
     tree.put("velocityX", state.velocityX);
     tree.put("velocityY", state.velocityY);
+    tree.put("active", state.active);
 }
 
 // Readers: a body from the JSON object, or nothing if a field is missing or ill-typed
@@ -50,8 +51,9 @@ std::optional<MessageBody> readPlayerState(const pt::ptree& tree) {
     auto height = readSize(tree, "height");
     auto velocityX = readFinite(tree, "velocityX");
     auto velocityY = readFinite(tree, "velocityY");
-    if (!x || !y || !width || !height || !velocityX || !velocityY) return std::nullopt;
-    return PlayerState{*x, *y, *width, *height, *velocityX, *velocityY};
+    auto active = tree.get_optional<bool>("active");
+    if (!x || !y || !width || !height || !velocityX || !velocityY || !active) return std::nullopt;
+    return PlayerState{*x, *y, *width, *height, *velocityX, *velocityY, *active};
 }
 
 std::optional<MessageBody> readBody(MessageType type, const pt::ptree& tree) {
