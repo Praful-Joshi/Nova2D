@@ -3,6 +3,7 @@
 add_library(nova2d_tag_core STATIC
     arena.cpp
     hud.cpp
+    message.cpp
     minimap.cpp
     tag_peer.cpp
 )
