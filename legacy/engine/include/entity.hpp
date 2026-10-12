@@ -92,6 +92,12 @@ public:
         groundEntityId = isOnGround ? groundId : -1;
     }
 
+    // An inactive Entity is out of the world for now (for example a player waiting to respawn):
+    // it isn't rendered, none of its Properties update, nothing collides with it, and games
+    // shouldn't treat it as touching anything
+    [[nodiscard]] bool isActive() const { return active; }
+    void setActive(bool isActive) { active = isActive; }
+
 private:
     SDL_Rect rect;        // rectangle shape
     double posX, posY;    // exact position
@@ -110,6 +116,7 @@ private:
     double deltaTime = 0;
     bool grounded = false;
     int groundEntityId = -1;
+    bool active = true;
 };
 
 #endif

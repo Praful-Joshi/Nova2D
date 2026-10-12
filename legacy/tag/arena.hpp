@@ -49,6 +49,12 @@ constexpr int PLATFORM1_ID = 10;
 constexpr int PLATFORM2_ID = 11;
 constexpr int ELEVATOR_ID = 12;
 
+// Entity IDs of the DeathZones in the two pits, and how long, in Timeline units, a player who
+// falls in stays out of the world before respawning at their SpawnPoint
+constexpr int PIT1_DEATHZONE_ID = 50;
+constexpr int PIT2_DEATHZONE_ID = 51;
+constexpr int64_t RESPAWN_DELAY = 1000;
+
 // Entity ID of the player owned by the given Peer
 constexpr int playerEntityId(int peerId) { return 1000 + peerId; }
 

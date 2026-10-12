@@ -16,6 +16,7 @@ void renderEntities(SDL_Renderer* renderer, Game& game) {
     for (const auto& [entityId, entityPtr] :
          game.getEntities()) {     // Iterate over the map of entities
         if (!entityPtr) continue;  // Check for null pointers
+        if (!entityPtr->isActive()) continue;  // Out of the world, e.g. waiting to respawn
         if (game.entityHasProperty(Property::DeathZone, entityId) ||
             game.entityHasProperty(Property::SpawnPoint, entityId) ||
             game.entityHasProperty(Property::SideBoundary, entityId)) {

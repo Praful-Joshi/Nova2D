@@ -15,7 +15,7 @@ void CollisionHandler::updateGameState(Entity& entity, Game& game) {
 
     for (const auto& [otherEntityId, otherEntityPtr] : game.getEntities()) {
         if (entity.getEntityID() == otherEntityId) continue;  // Skip self-collision
-        if (otherEntityPtr->getisMovable()) continue;
+        if (otherEntityPtr->getisMovable() || !otherEntityPtr->isActive()) continue;
         if (!game.entityHasProperty(Property::Collide, otherEntityId)) continue;
         resolveCollision(entity, *otherEntityPtr);
     }

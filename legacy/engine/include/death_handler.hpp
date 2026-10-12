@@ -1,6 +1,7 @@
 #ifndef DEATH_HANDLER
 #define DEATH_HANDLER
 
+#include "deathzone.hpp"
 #include "eventmanager.hpp"
 #include "game.hpp"
 
@@ -12,6 +13,7 @@ public:
 
 private:
     void updateGameState(Entity& entity, Game& game);
+    void respawn(Entity& player, const DeathZoneAttribute& deathZone, Game& game);
 };
 
 #endif

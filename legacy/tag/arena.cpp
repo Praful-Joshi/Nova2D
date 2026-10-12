@@ -2,6 +2,7 @@
 
 #include "collisions.hpp"
 #include "control.hpp"
+#include "deathzone.hpp"
 #include "gravity.hpp"
 #include "movement.hpp"
 #include "platform.hpp"
@@ -43,6 +44,16 @@ void addSpawnPoint(Game& game, int id, int x, int y) {
                                           0, false, false, false, id, 0);
     game.addEntity(spawn);
     game.addProperty(Property::SpawnPoint, id, std::make_shared<SpawnPointAttribute>());
+}
+
+// A DeathZone filling a pit from just below the ground line, deep enough that no fall skips it
+void addPitDeathZone(Game& game, int id, int left, int right) {
+    const int top = GROUND_TOP + PLAYER_SIZE;
+    auto zone = std::make_shared<Entity>(left, top, right - left, HEIGHT, SDL_Color{0, 0, 0, 0}, 0,
+                                         0, false, false, false, id, 0);
+    game.addEntity(zone);
+    game.addProperty(Property::DeathZone, id,
+                     std::make_shared<DeathZoneAttribute>(spawnPointId(1), RESPAWN_DELAY));
 }
 
 }  // namespace
@@ -92,6 +103,10 @@ void build(Game& game) {
     for (int peerId = 1; peerId <= MAX_PLAYERS; ++peerId) {
         addSpawnPoint(game, spawnPointId(peerId), SPAWN_X[peerId - 1], SPAWN_Y);
     }
+
+    // Falling into a pit respawns only that player, at their own SpawnPoint
+    addPitDeathZone(game, PIT1_DEATHZONE_ID, PIT1_LEFT, PIT1_RIGHT);
+    addPitDeathZone(game, PIT2_DEATHZONE_ID, PIT2_LEFT, PIT2_RIGHT);
 }
 
 std::shared_ptr<Entity> addPlayer(Game& game, int peerId, bool isLocal) {

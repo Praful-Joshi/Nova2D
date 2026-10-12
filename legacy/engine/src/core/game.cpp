@@ -48,7 +48,7 @@ void Game::updateProperties(Property propertyType, Timeline* timeline) {
     if (it != properties.end()) {
         for (const auto& [entityId, attribute] : it->second) {
             auto entity = getEntity(entityId);
-            if (entity != nullptr && attribute) {
+            if (entity != nullptr && entity->isActive() && attribute) {
                 // Use the updated method signature
                 attribute->update(*entity, *this);
             }
@@ -90,7 +90,7 @@ void Game::update() {
 
 void Game::carryRiders() {
     for (const auto& [id, entity] : entities) {
-        if (!entity->isGrounded()) continue;
+        if (!entity->isActive() || !entity->isGrounded()) continue;
         auto platform = std::dynamic_pointer_cast<Platform>(getEntity(entity->getGroundEntityId()));
         if (platform) entity->moveBy(platform->getLastDeltaX(), platform->getLastDeltaY());
     }

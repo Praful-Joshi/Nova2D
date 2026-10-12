@@ -1,4 +1,5 @@
 add_executable(nova2d_legacy_tests
+    test_deathzone.cpp
     test_physics.cpp
     test_text.cpp
 )
