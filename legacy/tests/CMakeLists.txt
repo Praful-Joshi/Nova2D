@@ -10,6 +10,7 @@ add_executable(nova2d_legacy_tests
     test_rounds.cpp
     test_tag_args.cpp
     test_text.cpp
+    test_timeline.cpp
 )
 
 target_link_libraries(nova2d_legacy_tests
