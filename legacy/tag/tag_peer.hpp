@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
@@ -78,6 +79,9 @@ public:
     // The Peer with authority over shared state: platforms, Rounds, ...
     [[nodiscard]] int hostId() const { return hostId_; }
     [[nodiscard]] bool isHost() const { return hostId_ == config_.peerId; }
+    // The new Host's Peer ID for a few seconds after Host Migration, for "Peer N is now Host"
+    [[nodiscard]] std::optional<int> hostChangeNotice() const;
+    static constexpr int64_t HOST_NOTICE_NS = 3'000'000'000;
     // This Peer and the Peers it can hear, ascending
     [[nodiscard]] std::vector<int> presentPeers() const;
 
@@ -131,6 +135,7 @@ private:
     Rounds rounds_;
     RoundHandler roundHandler_;
     int hostId_ = 1;
+    int64_t hostChangedAtNs_ = -1;  // real time of the last Host Migration
     int64_t nextHostStateNs_ = 0;
     std::mt19937 random_;
     // Host: Playing time already added to someone's It time this Round
@@ -144,6 +149,8 @@ private:
     // Handles a message for the game rules; players and departures are the network's job
     void handleMessage(const Message& message);
 
+    // A Peer left or timed out: the lowest remaining Peer takes over as Host if needed
+    void onPeerDeparted(int peerId);
     // Host only: starts and ends Rounds and broadcasts shared state
     void runHost();
     void startRound(int round, const std::vector<int>& participants);

@@ -147,6 +147,11 @@ void drawRoundHud(SDL_Renderer* renderer, TagPeer& peer) {
             break;
     }
 
+    if (const std::optional<int> newHost = peer.hostChangeNotice()) {
+        drawCentred(renderer, "PEER " + std::to_string(*newHost) + " IS NOW HOST", centreX, 140, 3,
+                    HIGHLIGHT);
+    }
+
     if (rounds.isSpectator(peer.peerId())) {
         drawCentred(renderer, "SPECTATING - YOU PLAY NEXT ROUND", centreX, height - 60, 2);
     }

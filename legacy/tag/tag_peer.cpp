@@ -60,7 +60,10 @@ TagPeer::TagPeer(const TagConfig& config, std::shared_ptr<Transport> transport)
 void TagPeer::tick(const Keys& keys, int64_t elapsedNs) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     nowNs_ += elapsedNs;
-    for (const Message& message : network_.receive(game_, nowNs_)) handleMessage(message);
+    const std::vector<Message> messages = network_.receive(game_, nowNs_);
+    // Departures first, so a new Host's messages that arrive alongside are followed
+    for (int departed : network_.departures()) onPeerDeparted(departed);
+    for (const Message& message : messages) handleMessage(message);
     // Once everyone expected has joined, send only changed state. It stays on if a Peer
     // leaves; a Peer that (re)joins is sent full state when first heard.
     if (static_cast<int>(presentPeers().size()) >= config_.players) {
@@ -119,6 +122,19 @@ void TagPeer::handleMessage(const Message& message) {
     }
 }
 
+void TagPeer::onPeerDeparted(int peerId) {
+    if (peerId != hostId_) return;
+    // Host Migration: a role change, continuing from the last HOST_STATE this Peer followed
+    hostId_ = presentPeers().front();
+    hostChangedAtNs_ = nowNs_;
+    network_.forceFullState();  // the new Host's full state, and everyone's player again
+}
+
+std::optional<int> TagPeer::hostChangeNotice() const {
+    if (hostChangedAtNs_ < 0 || nowNs_ - hostChangedAtNs_ >= HOST_NOTICE_NS) return std::nullopt;
+    return hostId_;
+}
+
 void TagPeer::runHost() {
     // A Round needs at least two players; a lone Peer practises in the Lobby
     const std::vector<int> present = presentPeers();
@@ -130,11 +146,24 @@ void TagPeer::runHost() {
             if (enoughPlayers) startRound(rounds_.round() + 1, present);
             break;
         case RoundPhase::COUNTDOWN:
-            break;  // every Peer runs the Countdown's clock itself
-        case RoundPhase::PLAYING:
-            runTagging();
-            if (rounds_.isTimeUp()) endRound();
+        case RoundPhase::PLAYING: {
+            // Players may have left: a Round needs two, and someone must be It
+            int remaining = 0;
+            for (int id : rounds_.participants()) {
+                if (std::binary_search(present.begin(), present.end(), id)) ++remaining;
+            }
+            if (remaining < 2) {
+                endRound();
+                break;
+            }
+            if (tagging::it(game_) == 0) reassignIt();
+            // Every Peer runs the Countdown's clock itself
+            if (rounds_.phase() == RoundPhase::PLAYING) {
+                runTagging();
+                if (rounds_.isTimeUp()) endRound();
+            }
             break;
+        }
         case RoundPhase::RESULTS:
             if (rounds_.isTimeUp()) {
                 if (present.size() >= 2) {
