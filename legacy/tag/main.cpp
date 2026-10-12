@@ -4,6 +4,7 @@
 
 #include "init.hpp"
 #include "input.hpp"
+#include "minimap.hpp"
 #include "render.hpp"
 #include "scaling.hpp"
 #include "tag_peer.hpp"
@@ -64,6 +65,7 @@ int main(int argc, char* argv[]) {
 
         clearScreen(renderer);
         renderEntities(renderer, peer.game());
+        minimap::draw(renderer, peer.game());
         // HUD placeholder, in screen space
         drawText(renderer, "TAG", 16, 16, 4, SDL_Color{255, 255, 255, 255});
         drawText(renderer, "NOVA2D LEGACY ENGINE", 16, 52, 2, SDL_Color{255, 255, 255, 255});
