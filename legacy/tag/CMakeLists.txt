@@ -5,6 +5,7 @@ add_library(nova2d_tag_core STATIC
     hud.cpp
     message.cpp
     minimap.cpp
+    tag_network.cpp
     tag_peer.cpp
 )
 

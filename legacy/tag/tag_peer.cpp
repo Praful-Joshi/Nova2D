@@ -1,5 +1,7 @@
 #include "tag_peer.hpp"
 
+#include <utility>
+
 #include "arena.hpp"
 
 namespace {
@@ -7,11 +9,19 @@ constexpr double GRAVITY = 0.002;  // pixels per Timeline unit squared
 constexpr int CONTROL_SPEED = 3;
 }  // namespace
 
-TagPeer::TagPeer(const TagConfig& config)
+std::string TagConfig::peerAddress(int otherPeerId) const {
+    auto it = peerAddresses.find(otherPeerId);
+    return it != peerAddresses.end() ? it->second : "localhost";
+}
+
+TagPeer::TagPeer(const TagConfig& config) : TagPeer(config, nullptr) {}
+
+TagPeer::TagPeer(const TagConfig& config, std::shared_ptr<Transport> transport)
     : config_(config),
       timeline_([this] { return nowNs_; }),
       game_(CONTROL_SPEED, GRAVITY, config.windowWidth, config.windowHeight, config.peerId, false,
-            config.players) {
+            config.players),
+      network_(config.peerId, std::move(transport)) {
     game_.setTimeline(timeline_);
     game_.setEventManager(events_);
     events_.registerHandler(EventType::COLLISION, &collisionHandler_);
@@ -24,11 +34,24 @@ TagPeer::TagPeer(const TagConfig& config)
 }
 
 void TagPeer::tick(const Keys& keys, int64_t elapsedNs) {
+    std::lock_guard<std::mutex> lock(stateMutex_);
     nowNs_ += elapsedNs;
+    for (const Message& message : network_.receive(game_, nowNs_)) handleMessage(message);
     handlePeerKeys(keys);
     game_.setInput(keys);
     game_.update();
+    network_.interpolate(game_, nowNs_);
+    network_.sendDue(localPlayer().get(), nowNs_);
     previousKeys_ = keys;
+}
+
+void TagPeer::leave() {
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    network_.leave();
+}
+
+void TagPeer::handleMessage(const Message& /*message*/) {
+    // Game-rule messages (Host state, Tagging, Rounds, ...) are handled here as they're added
 }
 
 bool TagPeer::pressed(const Keys& keys, SDL_Scancode key) const {
