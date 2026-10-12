@@ -102,24 +102,24 @@ TEST_CASE("Walking into the left SideBoundary zone scrolls the Camera back", "[l
 TEST_CASE("The Camera never scrolls past either end of the arena", "[legacy][camera]") {
     TagPeer peer(TagConfig{});
 
-    // Walk right off the far end of the arena
+    // Walk right to the far end of the arena
     placePlayerOnGround(peer, 1800);
     for (int i = 0; i < 300; ++i) {
         peer.tick(Keys{SDL_SCANCODE_RIGHT});
         REQUIRE(peer.game().getCamera().getX() >= 0);
         REQUIRE(peer.game().getCamera().getX() <= MAX_CAMERA_X);
     }
-    REQUIRE(peer.localPlayer()->getX() > arena::WIDTH);
+    REQUIRE(peer.localPlayer()->getX() == Approx(arena::WIDTH - arena::PLAYER_SIZE));
     REQUIRE(peer.game().getCamera().getX() == MAX_CAMERA_X);
 
-    // Then walk left off the near end
+    // Then walk left to the near end
     placePlayerOnGround(peer, 700);
     for (int i = 0; i < 300; ++i) {
         peer.tick(Keys{SDL_SCANCODE_LEFT});
         REQUIRE(peer.game().getCamera().getX() >= 0);
         REQUIRE(peer.game().getCamera().getX() <= MAX_CAMERA_X);
     }
-    REQUIRE(peer.localPlayer()->getX() < 0);
+    REQUIRE(peer.localPlayer()->getX() == Approx(0).margin(1e-6));
     REQUIRE(peer.game().getCamera().getX() == 0);
 }
 

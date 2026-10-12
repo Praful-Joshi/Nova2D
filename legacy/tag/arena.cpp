@@ -85,6 +85,10 @@ void build(Game& game) {
     addSolid(game, 2, PIT1_RIGHT, GROUND_TOP, PIT2_LEFT - PIT1_RIGHT, groundHeight, GROUND_COLOR);
     addSolid(game, 3, PIT2_RIGHT, GROUND_TOP, WIDTH - PIT2_RIGHT, groundHeight, GROUND_COLOR);
 
+    // Invisible walls just outside both ends, so players can't leave the arena
+    addSolid(game, 4, -100, -HEIGHT, 100, 2 * HEIGHT, SDL_Color{0, 0, 0, 0});
+    addSolid(game, 5, WIDTH, -HEIGHT, 100, 2 * HEIGHT, SDL_Color{0, 0, 0, 0});
+
     // Horizontal platforms bridging the pits, overlapping the ground edges at each end
     const int bridgeY = GROUND_TOP - 70;
     addMovingPlatform(game, PLATFORM1_ID, PIT1_LEFT - 40, bridgeY, 0, PLATFORM_SPEED,

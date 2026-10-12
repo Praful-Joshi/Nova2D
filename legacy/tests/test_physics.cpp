@@ -191,3 +191,18 @@ TEST_CASE("Holding Right runs right, and releasing it stops the player", "[legac
     tickFor(peer, 10);
     REQUIRE(player->getX() == Approx(stoppedX));
 }
+
+TEST_CASE("Players can't walk off either end of the arena", "[legacy][physics]") {
+    TagPeer peer(TagConfig{});
+    auto player = peer.localPlayer();
+    tickFor(peer, 60);
+
+    tickFor(peer, 120, Keys{SDL_SCANCODE_LEFT});  // 2 s: far enough to pass the left end
+    REQUIRE(player->getX() == Approx(0).margin(1e-6));
+    REQUIRE(bottomOf(player->getRect()) == arena::GROUND_TOP);
+
+    player->setPosition(arena::WIDTH - 200, arena::GROUND_TOP - arena::PLAYER_SIZE);
+    tickFor(peer, 120, Keys{SDL_SCANCODE_RIGHT});
+    REQUIRE(player->getX() == Approx(arena::WIDTH - arena::PLAYER_SIZE));
+    REQUIRE(bottomOf(player->getRect()) == arena::GROUND_TOP);
+}
