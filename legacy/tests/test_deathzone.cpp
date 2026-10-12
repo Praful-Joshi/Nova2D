@@ -63,7 +63,7 @@ TEST_CASE("A player who falls into a pit is hidden, then reappears at their own 
 }
 
 TEST_CASE("Each player respawns at their own SpawnPoint", "[legacy][tag][deathzone]") {
-    TagPeer peer(TagConfig{3, 3});
+    TagPeer peer(TagConfig{3, 3, 1280, 720, {}});
     auto spawn = peer.game().getEntity(arena::spawnPointId(3));
     REQUIRE(spawn);
 

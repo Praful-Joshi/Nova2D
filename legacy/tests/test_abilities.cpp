@@ -190,8 +190,8 @@ TEST_CASE("A shrink that ends under the low-gap wall waits for room before growi
 }
 
 TEST_CASE("Two Peers' players have independent abilities", "[tag][abilities]") {
-    TagPeer first(TagConfig{1, 2});
-    TagPeer second(TagConfig{2, 2});
+    TagPeer first(TagConfig{1, 2, 1280, 720, {}});
+    TagPeer second(TagConfig{2, 2, 1280, 720, {}});
     settle(first, 150);
     settle(second, 2000);
 
@@ -206,7 +206,7 @@ TEST_CASE("Two Peers' players have independent abilities", "[tag][abilities]") {
 
 TEST_CASE("One shared handler keeps two controlled players' abilities independent",
           "[tag][abilities]") {
-    TagPeer peer(TagConfig{1, 2});
+    TagPeer peer(TagConfig{1, 2, 1280, 720, {}});
     settle(peer, 150);
     auto first = peer.localPlayer();
     auto second = arena::addPlayer(peer.game(), 2, true);
