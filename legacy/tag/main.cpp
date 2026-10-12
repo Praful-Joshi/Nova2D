@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <map>
@@ -8,6 +9,7 @@
 #include <string>
 
 #include "arena.hpp"
+#include "autopilot.hpp"
 #include "hud.hpp"
 #include "init.hpp"
 #include "input.hpp"
@@ -72,6 +74,11 @@ int main(int argc, char* argv[]) {
     const char* screenshotFrames = std::getenv("NOVA2D_TAG_SCREENSHOT_FRAMES");
     const int screenshotFrame = screenshotFrames != nullptr ? std::atoi(screenshotFrames) : 60;
     int frame = 0;
+    // For demos: NOVA2D_TAG_AUTOPILOT plays by itself, and NOVA2D_TAG_RECORD=<dir> saves every
+    // third frame there as frame_NNNNN.bmp
+    const bool autopilotOn = std::getenv("NOVA2D_TAG_AUTOPILOT") != nullptr;
+    const char* recordDir = std::getenv("NOVA2D_TAG_RECORD");
+    int recordFrame = 0;
 
     auto transport = connectToPeers(config);
     if (!transport) return 1;
@@ -84,6 +91,7 @@ int main(int argc, char* argv[]) {
     }
 
     TagPeer peer(config, transport);
+    Autopilot autopilot(static_cast<unsigned>(config.peerId) * 7919u);
 
     using Clock = std::chrono::steady_clock;
     constexpr auto FRAME = std::chrono::nanoseconds(TagPeer::TICK_NS);
@@ -104,7 +112,7 @@ int main(int argc, char* argv[]) {
         const int64_t elapsedNs =
             std::chrono::duration_cast<std::chrono::nanoseconds>(now - lastFrame).count();
         lastFrame = now;
-        peer.tick(Keys::fromKeyboard(), elapsedNs);
+        peer.tick(autopilotOn ? autopilot.keys(peer) : Keys::fromKeyboard(), elapsedNs);
 
         clearScreen(renderer);
         {
@@ -116,6 +124,11 @@ int main(int argc, char* argv[]) {
             minimap::draw(renderer, peer.game(), hud::tagMarkerStyle(peer));
             hud::drawRoundHud(renderer, peer);
             hud::drawTimelineHud(renderer, peer);
+        }
+        if (recordDir != nullptr && recordFrame++ % 3 == 0) {
+            char name[32];
+            std::snprintf(name, sizeof(name), "/frame_%05d.bmp", recordFrame / 3);
+            saveFrame(renderer, (std::string(recordDir) + name).c_str());
         }
         if (screenshotPath != nullptr && ++frame == screenshotFrame) {
             saveFrame(renderer, screenshotPath);
