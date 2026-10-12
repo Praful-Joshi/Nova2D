@@ -13,10 +13,10 @@
 #include "input.hpp"
 #include "minimap.hpp"
 #include "render.hpp"
+#include "round_hud.hpp"
 #include "scaling.hpp"
 #include "tag_args.hpp"
 #include "tag_peer.hpp"
-#include "text.hpp"
 #include "zmq_transport.hpp"
 
 namespace {
@@ -111,10 +111,8 @@ int main(int argc, char* argv[]) {
             hud::drawAbilityBars(renderer, peer.game(), arena::playerEntityId(peer.peerId()),
                                  static_cast<int>(peer.game().getCamera().getX()));
             minimap::draw(renderer, peer.game());
+            hud::drawRoundHud(renderer, peer);
         }
-        // HUD placeholder, in screen space
-        drawText(renderer, "TAG", 16, 16, 4, SDL_Color{255, 255, 255, 255});
-        drawText(renderer, "NOVA2D LEGACY ENGINE", 16, 52, 2, SDL_Color{255, 255, 255, 255});
         if (screenshotPath != nullptr && ++frame == screenshotFrame) {
             saveFrame(renderer, screenshotPath);
             quit = true;

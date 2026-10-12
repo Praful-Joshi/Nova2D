@@ -8,6 +8,7 @@
 #include "platform.hpp"
 #include "sideboundary.hpp"
 #include "spawnpoint.hpp"
+#include "tag_player.hpp"
 
 namespace arena {
 
@@ -145,6 +146,7 @@ std::shared_ptr<Entity> addPlayer(Game& game, int peerId, bool isLocal) {
                                            0, true, isLocal, true, id, peerId);
     player->setSpawnPointId(spawnPointId(peerId));
     game.addEntity(player);
+    game.addProperty(Property::Custom, id, std::make_shared<TagPlayerAttribute>());
     game.addProperty(Property::Collide, id, std::make_shared<CollisionAttribute>());
     if (isLocal) {
         auto control = std::make_shared<ControlAttribute>(RUN_SPEED, JUMP_SPEED, DASH_COOLDOWN,

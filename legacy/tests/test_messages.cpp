@@ -74,3 +74,61 @@ TEST_CASE("Malformed messages are rejected without throwing", "[legacy][messages
         REQUIRE_FALSE(decoded.has_value());
     }
 }
+
+TEST_CASE("A HOST_STATE survives encoding and decoding unchanged", "[legacy][messages]") {
+    HostState state;
+    state.phase = RoundPhase::PLAYING;
+    state.remainingMs = 87'654;
+    state.round = 3;
+    state.participants = {1, 2, 4};
+    state.platforms = {PlatformState{10, 812.25, 590, 1, 1}, PlatformState{12, 1060, 433.5, 1, -1}};
+    const Message message{1, state};
+
+    const std::optional<Message> decoded = decodeMessage(encodeMessage(message));
+
+    REQUIRE(decoded.has_value());
+    REQUIRE(decoded->type() == MessageType::HOST_STATE);
+    REQUIRE(*decoded == message);
+}
+
+TEST_CASE("A HOST_STATE with no participants or platforms survives encoding and decoding",
+          "[legacy][messages]") {
+    const Message message{2, HostState{}};
+
+    const std::optional<Message> decoded = decodeMessage(encodeMessage(message));
+
+    REQUIRE(decoded.has_value());
+    REQUIRE(*decoded == message);
+}
+
+TEST_CASE("ROUND_START and ROUND_END survive encoding and decoding unchanged",
+          "[legacy][messages]") {
+    const Message start{1, RoundStart{5, {1, 3}}};
+    const Message end{1, RoundEnd{5}};
+
+    REQUIRE(decodeMessage(encodeMessage(start)) == std::optional<Message>(start));
+    REQUIRE(decodeMessage(encodeMessage(end)) == std::optional<Message>(end));
+    REQUIRE(decodeMessage(encodeMessage(start))->type() == MessageType::ROUND_START);
+    REQUIRE(decodeMessage(encodeMessage(end))->type() == MessageType::ROUND_END);
+}
+
+TEST_CASE("Malformed Round messages are rejected without throwing", "[legacy][messages]") {
+    const char* malformed[] = {
+        // unknown phase
+        "{\"type\":\"HOST_STATE\",\"sender\":\"1\",\"phase\":\"NAPPING\",\"remainingMs\":\"1\","
+        "\"round\":\"1\",\"participants\":\"\",\"platforms\":\"\"}",
+        // participant isn't a Peer ID
+        "{\"type\":\"HOST_STATE\",\"sender\":\"1\",\"phase\":\"LOBBY\",\"remainingMs\":\"1\","
+        "\"round\":\"1\",\"participants\":[\"two\"],\"platforms\":\"\"}",
+        // platform without a position
+        "{\"type\":\"HOST_STATE\",\"sender\":\"1\",\"phase\":\"LOBBY\",\"remainingMs\":\"1\","
+        "\"round\":\"1\",\"participants\":\"\",\"platforms\":[{\"id\":\"10\"}]}",
+        // no round
+        "{\"type\":\"ROUND_START\",\"sender\":\"1\",\"participants\":[\"1\"]}",
+        "{\"type\":\"ROUND_END\",\"sender\":\"1\"}",
+    };
+    for (const char* input : malformed) {
+        INFO(input);
+        REQUIRE_FALSE(decodeMessage(input).has_value());
+    }
+}

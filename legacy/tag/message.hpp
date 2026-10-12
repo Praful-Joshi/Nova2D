@@ -1,9 +1,13 @@
 #ifndef TAG_MESSAGE_HPP
 #define TAG_MESSAGE_HPP
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
+
+#include "round_phase.hpp"
 
 // Typed messages Peers send each other, one JSON object per message, encoded with Boost
 // property_tree. Every message carries its type and its sender's Peer ID.
@@ -39,10 +43,57 @@ struct Leaving {
     bool operator==(const Leaving&) const { return true; }
 };
 
-using MessageBody = std::variant<Heartbeat, PlayerState, Leaving>;
+// A moving platform as the Host simulates it
+struct PlatformState {
+    int id = 0;
+    double x = 0;
+    double y = 0;
+    int directionX = 1;
+    int directionY = 1;
+
+    bool operator==(const PlatformState& other) const {
+        return id == other.id && x == other.x && y == other.y &&
+               directionX == other.directionX && directionY == other.directionY;
+    }
+};
+
+// The shared state the Host has authority over, broadcast regularly
+struct HostState {
+    RoundPhase phase = RoundPhase::LOBBY;
+    int64_t remainingMs = 0;  // Timeline time left in the phase
+    int round = 0;
+    std::vector<int> participants;  // Peer IDs playing this Round; others are Spectators
+    std::vector<PlatformState> platforms;
+
+    bool operator==(const HostState& other) const {
+        return phase == other.phase && remainingMs == other.remainingMs &&
+               round == other.round && participants == other.participants &&
+               platforms == other.platforms;
+    }
+};
+
+// The Host starts a Round's Countdown with these players
+struct RoundStart {
+    int round = 0;
+    std::vector<int> participants;
+
+    bool operator==(const RoundStart& other) const {
+        return round == other.round && participants == other.participants;
+    }
+};
+
+// The Host ends a Round
+struct RoundEnd {
+    int round = 0;
+
+    bool operator==(const RoundEnd& other) const { return round == other.round; }
+};
+
+using MessageBody =
+    std::variant<Heartbeat, PlayerState, Leaving, HostState, RoundStart, RoundEnd>;
 
 // In the same order as MessageBody's alternatives
-enum class MessageType { HEARTBEAT, PLAYER_STATE, LEAVING };
+enum class MessageType { HEARTBEAT, PLAYER_STATE, LEAVING, HOST_STATE, ROUND_START, ROUND_END };
 
 struct Message {
     int sender = 0;  // Peer ID, from 1

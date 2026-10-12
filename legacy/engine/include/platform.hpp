@@ -24,6 +24,14 @@ public:
     [[nodiscard]] int getEndX() const { return endX; }
     [[nodiscard]] int getStartY() const { return startY; }
     [[nodiscard]] int getEndY() const { return endY; }
+    // Direction of travel along its axis: +1 or -1
+    [[nodiscard]] int getDirectionX() const { return directionX; }
+    [[nodiscard]] int getDirectionY() const { return directionY; }
+    void setDirection(int dirX, int dirY) {
+        directionX = dirX < 0 ? -1 : 1;
+        directionY = dirY < 0 ? -1 : 1;
+    }
+
     // How far the platform moved in its last update, so riders can move with it
     [[nodiscard]] double getLastDeltaX() const { return lastDeltaX; }
     [[nodiscard]] double getLastDeltaY() const { return lastDeltaY; }

@@ -35,6 +35,10 @@ public:
     void setBounds(const SDL_Rect& worldBounds) { bounds = worldBounds; }
     [[nodiscard]] const std::optional<SDL_Rect>& getBounds() const { return bounds; }
 
+    // While frozen, the Entity ignores all input: it can't run, jump, dash or shrink
+    void setFrozen(bool isFrozen) { frozen = isFrozen; }
+    [[nodiscard]] bool isFrozen() const { return frozen; }
+
     // While blocked (e.g. frozen), the Entity can't start a dash or a shrink
     void setAbilitiesBlocked(bool blocked) { abilitiesBlocked = blocked; }
     [[nodiscard]] bool areAbilitiesBlocked() const { return abilitiesBlocked; }
@@ -83,6 +87,7 @@ private:
 
     std::optional<SDL_Rect> bounds;
     bool abilitiesBlocked = false;
+    bool frozen = false;
 
     std::optional<int64_t> lastDashTime;
     bool shrunk = false;

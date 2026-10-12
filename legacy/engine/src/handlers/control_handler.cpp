@@ -141,9 +141,10 @@ void ControlHandler::onEvent(const Event& event) {
 }
 
 void ControlHandler::updateGameState(Entity& entity, Game& game) {
-    const Keys& keys = game.getInput();
     auto control = game.getAttribute<ControlAttribute>(Property::Control, entity.getEntityID());
     if (!control) return;
+    // A frozen Entity acts as if no keys are held
+    const Keys keys = control->isFrozen() ? Keys{} : game.getInput();
 
     const int64_t now = game.getTimeline()->getTime();
     const bool canUseAbilities = entity.getisMovable() && entity.getIsControllable();

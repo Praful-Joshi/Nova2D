@@ -20,7 +20,8 @@ TagConfig peerConfig(int peerId, int players) {
 }
 
 // A Peer on the in-memory network
-std::unique_ptr<TagPeer> joinPeer(InMemoryNetwork& network, int peerId, int players = 2) {
+// Expects 4 players, so these Peers stay in the Lobby and Rounds never hold players still
+std::unique_ptr<TagPeer> joinPeer(InMemoryNetwork& network, int peerId, int players = 4) {
     return std::make_unique<TagPeer>(peerConfig(peerId, players),
                                      std::make_shared<InMemoryTransport>(network));
 }
