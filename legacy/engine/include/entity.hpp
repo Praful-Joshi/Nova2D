@@ -9,7 +9,7 @@
 class Entity {
 public:
     Entity(int x, int y, int w, int h, SDL_Color color, double velY, double velX, bool gravity,
-           bool control, bool movable, int EntityID, int ClientID)
+           bool control, bool movable, int EntityID, int PeerID)
         : posX(x),
           posY(y),
           velocityY(velY),
@@ -20,7 +20,7 @@ public:
           color(color),
           EntityID(EntityID),
           spawnPointId(-1),
-          ClientID(ClientID) {
+          PeerID(PeerID) {
         rect.x = x;
         rect.y = y;
         rect.w = w;
@@ -40,7 +40,7 @@ public:
     [[nodiscard]] bool getisMovable() const { return isMovable; }
     [[nodiscard]] SDL_Color getColor() const { return color; }
     [[nodiscard]] int getEntityID() const { return EntityID; }
-    [[nodiscard]] int getClientID() const { return ClientID; }
+    [[nodiscard]] int getPeerID() const { return PeerID; }
     [[nodiscard]] int getSpawnPointId() const { return spawnPointId; }
 
     // Setters
@@ -62,7 +62,7 @@ public:
     void setIsControllable(bool controllable) { isControllable = controllable; }
     void setColor(SDL_Color newColor) { color = newColor; }
     void setEntityID(int newID) { EntityID = newID; }
-    void setClientID(int newID) { ClientID = newID; }
+    void setPeerID(int newID) { PeerID = newID; }
     void setIsMovable(bool movable) { isMovable = movable; }
     void setSpawnPointId(int spawnID) { spawnPointId = spawnID; }
 
@@ -109,7 +109,7 @@ private:
     SDL_Color color;      // color
     int EntityID;         // Entity ID
     int spawnPointId;
-    int ClientID;  // Client ID
+    int PeerID;  // ID of the Peer that owns this Entity; 0 for the shared world
 
     int64_t lastTime = 0;
     int64_t frameDelta = 0;

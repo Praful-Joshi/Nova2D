@@ -1,12 +1,12 @@
-#ifndef SIDEBOUNDARY_HANLDER
-#define SIDEBOUNDARY_HANLDER
+#ifndef SIDEBOUNDARY_HANDLER
+#define SIDEBOUNDARY_HANDLER
 
 #include "eventmanager.hpp"
 #include "game.hpp"
 
 // Scrolls the Camera when the local (controllable) player enters a SideBoundary zone. The zone's
-// rect is in screen space, so it is compared against the player's screen position (World
-// Coordinates minus the Camera). Entities never move.
+// rect is in screen space, so it is compared against where the player is drawn: its World
+// Coordinates minus the Camera. Entities never move.
 class SideBoundaryHandler : public EventHandler {
 public:
     SideBoundaryHandler() = default;

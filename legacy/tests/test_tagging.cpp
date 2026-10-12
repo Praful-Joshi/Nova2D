@@ -77,25 +77,25 @@ int countIt(TagPeer& viewer) {
 TEST_CASE("At Round start exactly one player is It on every Peer, and It can't move for the "
           "first 2 s of Playing",
           "[legacy][tagging]") {
-    TwoPeers match(GENERATE(1u, 2u, 3u, 4u));
-    REQUIRE(tickUntil(match.all(), [&] { return match.allIn(RoundPhase::COUNTDOWN); },
+    TwoPeers peers(GENERATE(1u, 2u, 3u, 4u));
+    REQUIRE(tickUntil(peers.all(), [&] { return peers.allIn(RoundPhase::COUNTDOWN); },
                       TICKS_PER_SECOND) >= 0);
-    tickAll(match.all(), 5);
+    tickAll(peers.all(), 5);
 
-    const int it = match.peer1->itPeerId();
+    const int it = peers.peer1->itPeerId();
     REQUIRE((it == 1 || it == 2));
-    REQUIRE(match.allSeeIt(it));
-    for (TagPeer* peer : match.all()) REQUIRE(countIt(*peer) == 1);
+    REQUIRE(peers.allSeeIt(it));
+    for (TagPeer* peer : peers.all()) REQUIRE(countIt(*peer) == 1);
 
-    REQUIRE(tickUntil(match.all(), [&] { return match.allIn(RoundPhase::PLAYING); },
+    REQUIRE(tickUntil(peers.all(), [&] { return peers.allIn(RoundPhase::PLAYING); },
                       4 * TICKS_PER_SECOND) >= 0);
     // Each player runs away from the arena's nearer end
     const auto runKey = [](int peerId) {
         return Keys{peerId == 1 ? SDL_SCANCODE_RIGHT : SDL_SCANCODE_LEFT};
     };
     const int runner = otherPlayer(it);
-    TagPeer& itPeer = match.peer(it);
-    TagPeer& runnerPeer = match.peer(runner);
+    TagPeer& itPeer = peers.peer(it);
+    TagPeer& runnerPeer = peers.peer(runner);
     const double itStartX = itPeer.localPlayer()->getX();
     const double runnerStartX = runnerPeer.localPlayer()->getX();
 
@@ -106,65 +106,65 @@ TEST_CASE("At Round start exactly one player is It on every Peer, and It can't m
     }
     REQUIRE(itPeer.localPlayer()->getX() == itStartX);
     REQUIRE(std::abs(runnerPeer.localPlayer()->getX() - runnerStartX) > 300);
-    for (TagPeer* peer : match.all()) REQUIRE(peer->isFrozen(it));
+    for (TagPeer* peer : peers.all()) REQUIRE(peer->isFrozen(it));
 
     // 2.3 s in: It runs too
-    match.tickHolding(it, runKey(it), static_cast<int>(0.5 * TICKS_PER_SECOND));
+    peers.tickHolding(it, runKey(it), static_cast<int>(0.5 * TICKS_PER_SECOND));
     REQUIRE(std::abs(itPeer.localPlayer()->getX() - itStartX) > 50);
-    for (TagPeer* peer : match.all()) REQUIRE_FALSE(peer->isFrozen(it));
+    for (TagPeer* peer : peers.all()) REQUIRE_FALSE(peer->isFrozen(it));
 }
 
 TEST_CASE("It touching another player passes It to them on every Peer, and they can't tag "
           "back the player who tagged them for 2 s",
           "[legacy][tagging]") {
-    TwoPeers match(GENERATE(1u, 2u, 3u, 4u));
-    match.playFor(2.5);
-    const int firstIt = match.peer1->itPeerId();
+    TwoPeers peers(GENERATE(1u, 2u, 3u, 4u));
+    peers.playFor(2.5);
+    const int firstIt = peers.peer1->itPeerId();
     const int runner = otherPlayer(firstIt);
 
     // Each Peer moves its own player to the same spot
-    standAt(match.peer(firstIt), 400);
-    standAt(match.peer(runner), 400);
-    REQUIRE(tickUntil(match.all(), [&] { return match.allSeeIt(runner); },
+    standAt(peers.peer(firstIt), 400);
+    standAt(peers.peer(runner), 400);
+    REQUIRE(tickUntil(peers.all(), [&] { return peers.allSeeIt(runner); },
                       TICKS_PER_SECOND) >= 0);
-    for (TagPeer* peer : match.all()) {
+    for (TagPeer* peer : peers.all()) {
         REQUIRE(countIt(*peer) == 1);
         REQUIRE(peer->isImmune(firstIt));
         REQUIRE_FALSE(peer->isImmune(runner));
     }
 
     // Still touching, but the new It can't tag back within 2 s
-    tickAll(match.all(), static_cast<int>(1.8 * TICKS_PER_SECOND));
-    REQUIRE(match.allSeeIt(runner));
+    tickAll(peers.all(), static_cast<int>(1.8 * TICKS_PER_SECOND));
+    REQUIRE(peers.allSeeIt(runner));
 
     // Afterwards they can
-    REQUIRE(tickUntil(match.all(), [&] { return match.allSeeIt(firstIt); },
+    REQUIRE(tickUntil(peers.all(), [&] { return peers.allSeeIt(firstIt); },
                       TICKS_PER_SECOND / 2) >= 0);
-    for (TagPeer* peer : match.all()) REQUIRE(peer->isImmune(runner));
+    for (TagPeer* peer : peers.all()) REQUIRE(peer->isImmune(runner));
 }
 
 TEST_CASE("A Tag-back Immune player can't dash or shrink", "[legacy][tagging]") {
-    TwoPeers match(GENERATE(1u, 2u));
-    match.playFor(2.5);
-    const int firstIt = match.peer1->itPeerId();
+    TwoPeers peers(GENERATE(1u, 2u));
+    peers.playFor(2.5);
+    const int firstIt = peers.peer1->itPeerId();
     const int runner = otherPlayer(firstIt);
-    standAt(match.peer(firstIt), 400);
-    standAt(match.peer(runner), 400);
-    REQUIRE(tickUntil(match.all(), [&] { return match.allSeeIt(runner); },
+    standAt(peers.peer(firstIt), 400);
+    standAt(peers.peer(runner), 400);
+    REQUIRE(tickUntil(peers.all(), [&] { return peers.allSeeIt(runner); },
                       TICKS_PER_SECOND) >= 0);
 
     // The player who tagged is Immune: holding the shrink keys does nothing
-    TagPeer& immunePeer = match.peer(firstIt);
+    TagPeer& immunePeer = peers.peer(firstIt);
     REQUIRE(immunePeer.isImmune(firstIt));
-    match.tickHolding(firstIt, Keys{SDL_SCANCODE_S, SDL_SCANCODE_H}, 30);
+    peers.tickHolding(firstIt, Keys{SDL_SCANCODE_S, SDL_SCANCODE_H}, 30);
     REQUIRE(immunePeer.localPlayer()->getRect().w == arena::PLAYER_SIZE);
 }
 
 TEST_CASE("Only the Host's view decides a Tagging", "[legacy][tagging]") {
-    TwoPeers match(GENERATE(1u, 2u, 3u, 4u));
-    match.playFor(2.5);
-    const int it = match.peer1->itPeerId();
-    TagPeer& peer2 = *match.peer2;  // not Host
+    TwoPeers peers(GENERATE(1u, 2u, 3u, 4u));
+    peers.playFor(2.5);
+    const int it = peers.peer1->itPeerId();
+    TagPeer& peer2 = *peers.peer2;  // not Host
 
     // Peer 2 moves its player onto Peer 1's, as Peer 2 sees it, while the Host is stalled
     auto peer1Player = playerOf(peer2, 1);
@@ -177,31 +177,31 @@ TEST_CASE("Only the Host's view decides a Tagging", "[legacy][tagging]") {
     }
 
     // Once the Host sees the overlap too, it decides the Tagging
-    REQUIRE(tickUntil(match.all(), [&] { return match.allSeeIt(otherPlayer(it)); },
+    REQUIRE(tickUntil(peers.all(), [&] { return peers.allSeeIt(otherPlayer(it)); },
                       TICKS_PER_SECOND) >= 0);
 }
 
 TEST_CASE("It-time totals add up to the Round length, and the player It the least wins",
           "[legacy][tagging]") {
-    TwoPeers match(GENERATE(1u, 2u));
-    match.playFor(30);
-    const int firstIt = match.peer1->itPeerId();
+    TwoPeers peers(GENERATE(1u, 2u));
+    peers.playFor(30);
+    const int firstIt = peers.peer1->itPeerId();
     const int runner = otherPlayer(firstIt);
 
     // Tagged about 30 s in, then they part
-    standAt(match.peer(firstIt), 400);
-    standAt(match.peer(runner), 400);
-    REQUIRE(tickUntil(match.all(), [&] { return match.allSeeIt(runner); },
+    standAt(peers.peer(firstIt), 400);
+    standAt(peers.peer(runner), 400);
+    REQUIRE(tickUntil(peers.all(), [&] { return peers.allSeeIt(runner); },
                       TICKS_PER_SECOND) >= 0);
     const double taggedAtMs =
-        static_cast<double>(Rounds::PLAYING_MS - match.peer1->rounds().remainingMs());
-    standAt(match.peer(runner), 2300);
+        static_cast<double>(Rounds::PLAYING_MS - peers.peer1->rounds().remainingMs());
+    standAt(peers.peer(runner), 2300);
 
-    REQUIRE(tickUntil(match.all(), [&] { return match.allIn(RoundPhase::RESULTS); },
+    REQUIRE(tickUntil(peers.all(), [&] { return peers.allIn(RoundPhase::RESULTS); },
                       100 * TICKS_PER_SECOND) >= 0);
-    tickAll(match.all(), 5);
+    tickAll(peers.all(), 5);
 
-    for (TagPeer* peer : match.all()) {
+    for (TagPeer* peer : peers.all()) {
         INFO("Peer " << peer->peerId());
         const double firstItMs = static_cast<double>(peer->itTimeMs(firstIt));
         const double runnerMs = static_cast<double>(peer->itTimeMs(runner));
@@ -212,33 +212,33 @@ TEST_CASE("It-time totals add up to the Round length, and the player It the leas
 }
 
 TEST_CASE("A reassigned It is frozen for 2 s on every Peer", "[legacy][tagging]") {
-    TwoPeers match(GENERATE(1u, 2u));
-    match.playFor(10);
+    TwoPeers peers(GENERATE(1u, 2u));
+    peers.playFor(10);
 
-    match.peer1->reassignIt();  // as the Host would when It leaves
-    tickAll(match.all(), 5);
-    const int it = match.peer1->itPeerId();
+    peers.peer1->reassignIt();  // as the Host would when It leaves
+    tickAll(peers.all(), 5);
+    const int it = peers.peer1->itPeerId();
     REQUIRE((it == 1 || it == 2));
-    REQUIRE(match.allSeeIt(it));
-    for (TagPeer* peer : match.all()) REQUIRE(peer->isFrozen(it));
+    REQUIRE(peers.allSeeIt(it));
+    for (TagPeer* peer : peers.all()) REQUIRE(peer->isFrozen(it));
 
-    tickAll(match.all(), 2 * TICKS_PER_SECOND);
-    for (TagPeer* peer : match.all()) REQUIRE_FALSE(peer->isFrozen(it));
+    tickAll(peers.all(), 2 * TICKS_PER_SECOND);
+    for (TagPeer* peer : peers.all()) REQUIRE_FALSE(peer->isFrozen(it));
 }
 
 TEST_CASE("It falling into a pit is still It after respawning", "[legacy][tagging]") {
-    TwoPeers match(GENERATE(1u, 2u));
-    match.playFor(2.5);
-    const int it = match.peer1->itPeerId();
-    TagPeer& itPeer = match.peer(it);
+    TwoPeers peers(GENERATE(1u, 2u));
+    peers.playFor(2.5);
+    const int it = peers.peer1->itPeerId();
+    TagPeer& itPeer = peers.peer(it);
 
     // Just below the moving platform, over the first pit
     itPeer.localPlayer()->setPosition(880, arena::GROUND_TOP + 10);
-    REQUIRE(tickUntil(match.all(), [&] { return !itPeer.localPlayer()->isActive(); },
+    REQUIRE(tickUntil(peers.all(), [&] { return !itPeer.localPlayer()->isActive(); },
                       TICKS_PER_SECOND) >= 0);
-    REQUIRE(tickUntil(match.all(), [&] { return itPeer.localPlayer()->isActive(); },
+    REQUIRE(tickUntil(peers.all(), [&] { return itPeer.localPlayer()->isActive(); },
                       3 * TICKS_PER_SECOND) >= 0);
-    tickAll(match.all(), TICKS_PER_SECOND / 2);
+    tickAll(peers.all(), TICKS_PER_SECOND / 2);
 
-    REQUIRE(match.allSeeIt(it));
+    REQUIRE(peers.allSeeIt(it));
 }

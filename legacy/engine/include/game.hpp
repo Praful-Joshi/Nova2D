@@ -34,17 +34,14 @@ class EventManager;
 
 class Game {
 public:
-    Game(int control, double gravity, int curW, int curH, int ClientID, bool useEfficientComm,
-         int noplayersJoining)
-        : ClientID(ClientID), camera(curW, curH) {
+    Game(int control, double gravity, int curW, int curH, int peerId)
+        : PeerID(peerId), camera(curW, curH) {
         controllableSpeed = control;
         gravityStrength = gravity;
         cur_w = curW;
         cur_h = curH;
         base_w = curW;
         base_h = curH;
-        useEfficientCommunication = useEfficientComm;
-        noPlayersJoining = noplayersJoining;
     }
 
     // void addEntity(Entity* entity);
@@ -123,13 +120,8 @@ public:
     // void updateEntitySizes(ScalingMode scalingMode, std::unordered_map<Entity*, SDL_Rect>
     // originalSizes, int cur_w, int cur_h);
 
-    // Whether to send only state that changed once every expected player has joined
-    bool getUseEfficientCommunication() const { return useEfficientCommunication; }
-    // Number of players expected to join
-    int getExpectedPlayers() const { return noPlayersJoining; }
-
-    // current client ID
-    const int ClientID;
+    // ID of the Peer running this game
+    const int PeerID;
 
 private:
     // List of entities
@@ -166,9 +158,6 @@ private:
 
     // Stores the initial size of each entity for proportional scaling
     std::unordered_map<Entity*, SDL_Rect> originalSizes;
-
-    bool useEfficientCommunication = false;
-    int noPlayersJoining = 0;
 
     EventManager* eventManager = nullptr;
     Keys input;

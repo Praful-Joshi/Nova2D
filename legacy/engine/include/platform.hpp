@@ -7,8 +7,8 @@ class Platform : public Entity {
 public:
     // Constructor for Platform with specific movement properties
     Platform(int x, int y, int w, int h, SDL_Color color, double velY, double velX, bool gravity,
-             int EntityID, int ClientID, int startX, int endX, int startY, int endY)
-        : Entity(x, y, w, h, color, velY, velX, false, false, false, EntityID, ClientID),
+             int EntityID, int PeerID, int startX, int endX, int startY, int endY)
+        : Entity(x, y, w, h, color, velY, velX, false, false, false, EntityID, PeerID),
           startX(startX),
           endX(endX),
           startY(startY),
