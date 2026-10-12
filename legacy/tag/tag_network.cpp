@@ -44,10 +44,22 @@ std::vector<Message> TagNetwork::receive(Game& game, int64_t nowNs) {
         } else {
             // Any other message shows the sender is here; the first one adds its player
             auto [remote, isNew] = remotes_.try_emplace(sender);
-            if (isNew) arena::addPlayer(game, sender, false);
+            if (isNew) {
+                arena::addPlayer(game, sender, false);
+                forceFullState();  // it hasn't seen state that hasn't changed lately
+            }
             remote->second.lastHeardNs = nowNs;
             if (const auto* state = std::get_if<PlayerState>(&message->body)) {
-                remote->second.snapshots.push_back(Snapshot{nowNs, *state});
+                auto& snapshots = remote->second.snapshots;
+                // After a quiet spell (a still player sends nothing under change-only
+                // syncing), the player held its last state until just before this one: without
+                // that, it would be drawn moving towards this state across the whole spell
+                if (!snapshots.empty() &&
+                    nowNs - snapshots.back().receivedNs > 2 * STATE_INTERVAL_NS) {
+                    snapshots.push_back(
+                        Snapshot{nowNs - STATE_INTERVAL_NS, snapshots.back().state});
+                }
+                snapshots.push_back(Snapshot{nowNs, *state});
             }
         }
         messages.push_back(std::move(*message));
@@ -95,9 +107,9 @@ void TagNetwork::interpolate(Game& game, int64_t nowNs) {
 void TagNetwork::sendDue(const Entity* localPlayer, int64_t nowNs) {
     if (!transport_) return;
     if (localPlayer != nullptr && nowNs >= nextStateNs_) {
-        send(PlayerState{localPlayer->getX(), localPlayer->getY(), localPlayer->getRect().w,
-                         localPlayer->getRect().h, localPlayer->getVelocityX(),
-                         localPlayer->getVelocityY(), localPlayer->isActive()});
+        sendState(PlayerState{localPlayer->getX(), localPlayer->getY(), localPlayer->getRect().w,
+                              localPlayer->getRect().h, localPlayer->getVelocityX(),
+                              localPlayer->getVelocityY(), localPlayer->isActive()});
         nextStateNs_ = nextDue(nextStateNs_, STATE_INTERVAL_NS, nowNs);
     }
     if (nowNs >= nextHeartbeatNs_) {
@@ -108,6 +120,14 @@ void TagNetwork::sendDue(const Entity* localPlayer, int64_t nowNs) {
 
 void TagNetwork::send(const MessageBody& body) {
     if (transport_) transport_->send(encodeMessage(Message{peerId_, body}));
+}
+
+void TagNetwork::sendState(const MessageBody& body) {
+    const auto type = static_cast<MessageType>(body.index());
+    auto last = lastSent_.find(type);
+    if (changeOnly_ && last != lastSent_.end() && last->second == body) return;
+    send(body);
+    lastSent_.insert_or_assign(type, body);
 }
 
 void TagNetwork::leave() {

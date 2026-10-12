@@ -15,6 +15,10 @@
 // player for each Peer it hears from, removes it when that Peer leaves or goes silent, and
 // moves remote players smoothly between the snapshots they send.
 //
+// Change-only syncing: once switched on, state messages (PLAYER_STATE, HOST_STATE, ...) go out
+// only when their contents changed since the last one of their type, still at most at their
+// 30 Hz cadence. Heartbeats keep their rate, so a still Peer isn't taken for a departed one.
+//
 // All times are real time in nanoseconds (the Peer's tick clock, not Timeline time), so
 // pausing the Timeline doesn't stop networking.
 class TagNetwork {
@@ -41,6 +45,16 @@ public:
 
     // Sends a message from this Peer to all others now
     void send(const MessageBody& body);
+    // Sends a state message now, unless change-only syncing is on and it's the same as the
+    // last one of its type sent
+    void sendState(const MessageBody& body);
+
+    void setChangeOnly(bool on) { changeOnly_ = on; }
+    [[nodiscard]] bool changeOnly() const { return changeOnly_; }
+    // The next state message of each type is sent whether it changed or not, e.g. so a Peer
+    // that just joined, or a newly promoted Host, has complete state. Hearing a new Peer
+    // does this automatically.
+    void forceFullState() { lastSent_.clear(); }
 
     // Tells the other Peers this Peer is quitting, then goes offline
     void leave();
@@ -66,6 +80,8 @@ private:
     std::vector<int> departed_;
     int64_t nextStateNs_ = 0;
     int64_t nextHeartbeatNs_ = 0;
+    bool changeOnly_ = false;
+    std::map<MessageType, MessageBody> lastSent_;  // the last state message of each type
 
     void depart(Game& game, int peerId);
 };

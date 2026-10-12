@@ -60,6 +60,10 @@ public:
     // Tells the other Peers this Peer is quitting (a clean quit); it then plays offline
     void leave();
 
+    // Makes this Peer send its full state (PLAYER_STATE, and HOST_STATE if Host) at the next
+    // 30 Hz send, even if change-only syncing would skip it as unchanged
+    void requestFullState();
+
     // IDs of the other Peers whose players are in the game, ascending
     [[nodiscard]] std::vector<int> connectedPeers() const { return network_.connectedPeers(); }
     // IDs of the Peers that left or timed out during the last tick

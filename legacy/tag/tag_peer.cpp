@@ -45,6 +45,11 @@ void TagPeer::tick(const Keys& keys, int64_t elapsedNs) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     nowNs_ += elapsedNs;
     for (const Message& message : network_.receive(game_, nowNs_)) handleMessage(message);
+    // Once everyone expected has joined, send only changed state. It stays on if a Peer
+    // leaves; a Peer that (re)joins is sent full state when first heard.
+    if (static_cast<int>(presentPeers().size()) >= config_.players) {
+        network_.setChangeOnly(true);
+    }
     handlePeerKeys(keys);
     if (isHost()) runHost();
     events_.processEvents();  // Round changes take effect before this frame's physics
@@ -69,6 +74,11 @@ std::vector<int> TagPeer::presentPeers() const {
 void TagPeer::leave() {
     std::lock_guard<std::mutex> lock(stateMutex_);
     network_.leave();
+}
+
+void TagPeer::requestFullState() {
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    network_.forceFullState();
 }
 
 void TagPeer::handleMessage(const Message& message) {
@@ -143,7 +153,7 @@ void TagPeer::sendHostStateDue() {
     }
     std::sort(state.platforms.begin(), state.platforms.end(),
               [](const PlatformState& a, const PlatformState& b) { return a.id < b.id; });
-    network_.send(state);
+    network_.sendState(state);
 }
 
 void TagPeer::followHost(const HostState& state) {
@@ -179,6 +189,7 @@ void TagPeer::onRoundEvent(const Event& event) {
     if (event.name() == ROUND_START) {
         rounds_.enter(RoundPhase::COUNTDOWN, round, participants, Rounds::COUNTDOWN_MS);
         if (!rounds_.isSpectator(config_.peerId)) placeAtSpawn();
+        network_.forceFullState();  // so Spectators and new players have complete state
     } else if (event.name() == ROUND_END) {
         rounds_.enter(RoundPhase::RESULTS, round, participants, Rounds::RESULTS_MS);
     }
