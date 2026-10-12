@@ -19,8 +19,6 @@
 
 #include "property.hpp"
 // #include <zmq.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
 #include <unordered_map>
 
 #include "attribute.hpp"
@@ -30,7 +28,6 @@
 #include "gravity.hpp"
 #include "input.hpp"
 #include "movement.hpp"
-#include "peer.hpp"
 #include "scaling.hpp"
 
 class EventManager;
@@ -52,8 +49,8 @@ public:
 
     // void addEntity(Entity* entity);
     void addEntity(const std::shared_ptr<Entity>& entity);
+    // Removes the Entity and all of its Attributes
     void removeEntity(const std::shared_ptr<Entity>& entity);
-    void updatePreviousEntityStates(Game& game);
 
     std::shared_ptr<Entity> getEntity(const int& GUID);
 
@@ -126,26 +123,10 @@ public:
     // void updateEntitySizes(ScalingMode scalingMode, std::unordered_map<Entity*, SDL_Rect>
     // originalSizes, int cur_w, int cur_h);
 
-    std::vector<std::string> serializeEntitiesServerSide(Game& game);
-    std::vector<std::string> serializeEntitiesClientSide(Game& game);
-    void deserializeEntitiesServerSide(const std::vector<std::string>& jsons, Game& game,
-                                       Peer& peer);
-    void deserializeEntitiesClientSide(const std::vector<std::string>& jsons, Game& game,
-                                       Peer& peer);
-
-    // std::vector<std::string> serializeEntitiesClientSide();
-    // std::vector<std::string> serializeEntitiesServerSide();
-
-    // void deserializeEntitiesClientSide(const std::vector<std::string>& jsons, Game& game);
-    // void deserializeEntitiesServerSide(const std::vector<std::string>& jsons, Game& game);
-
-    // void PublishGameState();
-
-    // void ConnectToServer(const std::string &sub_address, const std::string &pub_address);
-
-    // void UpdateGameState(bool initializeGame);
-
-    // void initializeGame(const std::vector<std::string> &jsons, Game &game);
+    // Whether to send only state that changed once every expected player has joined
+    bool getUseEfficientCommunication() const { return useEfficientCommunication; }
+    // Number of players expected to join
+    int getExpectedPlayers() const { return noPlayersJoining; }
 
     // current client ID
     const int ClientID;
@@ -188,17 +169,12 @@ private:
 
     bool useEfficientCommunication = false;
     int noPlayersJoining = 0;
-    bool didAllPlayersJoin = false;
 
     EventManager* eventManager = nullptr;
     Keys input;
 
     // Moves entities standing on moving platforms along with them
     void carryRiders();
-    // Client Sockets
-    // zmq::context_t context;
-    // zmq::socket_t  publisher;
-    // zmq::socket_t  subscriber;
 };
 
 #endif

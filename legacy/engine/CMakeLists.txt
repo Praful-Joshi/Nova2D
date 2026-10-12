@@ -17,7 +17,8 @@ add_library(nova2d_legacy_engine STATIC
     src/modules/platform.cpp
     src/modules/sideboundary.cpp
     src/modules/spawnpoint.cpp
-    src/networking/peer.cpp
+    src/networking/in_memory_transport.cpp
+    src/networking/zmq_transport.cpp
     src/rendering/render.cpp
     src/rendering/scaling.cpp
     src/rendering/text.cpp
