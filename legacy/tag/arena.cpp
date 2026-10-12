@@ -24,6 +24,13 @@ constexpr double PLATFORM_SPEED = 0.08;  // pixels per Timeline unit
 constexpr int SPAWN_Y = 500;
 constexpr int SPAWN_X[MAX_PLAYERS] = {150, 2370, 1280, 650};
 
+// Player movement and abilities; speeds in pixels per Timeline unit, times in Timeline units
+constexpr double RUN_SPEED = 0.35;
+constexpr double JUMP_SPEED = 0.8;
+constexpr int64_t DASH_COOLDOWN = 10000;
+constexpr int64_t SHRINK_DURATION = 5000;
+constexpr int64_t SHRINK_COOLDOWN = 8000;
+
 void addSolid(Game& game, int id, int x, int y, int w, int h, SDL_Color color) {
     auto entity = std::make_shared<Entity>(x, y, w, h, color, 0, 0, false, false, false, id, 0);
     game.addEntity(entity);
@@ -140,7 +147,10 @@ std::shared_ptr<Entity> addPlayer(Game& game, int peerId, bool isLocal) {
     game.addEntity(player);
     game.addProperty(Property::Collide, id, std::make_shared<CollisionAttribute>());
     if (isLocal) {
-        game.addProperty(Property::Control, id, std::make_shared<ControlAttribute>());
+        auto control = std::make_shared<ControlAttribute>(RUN_SPEED, JUMP_SPEED, DASH_COOLDOWN,
+                                                          SHRINK_DURATION, SHRINK_COOLDOWN);
+        control->setBounds(SDL_Rect{0, 0, WIDTH, HEIGHT});
+        game.addProperty(Property::Control, id, control);
         game.addProperty(Property::Move, id, std::make_shared<MovementAttribute>());
         game.addProperty(Property::Gravity, id, std::make_shared<GravityAttribute>());
     }

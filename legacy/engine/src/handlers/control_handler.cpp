@@ -4,9 +4,135 @@
 #else
 #include <SDL.h>
 #endif
-#include <cstring>
+#include <algorithm>
+#include <cmath>
 
 #include "control.hpp"
+
+namespace {
+
+// Direction keys: each runs or jumps while held and dashes when double-tapped
+constexpr SDL_Scancode DIRECTION_KEYS[] = {SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_LEFT,
+                                           SDL_SCANCODE_RIGHT};
+
+SDL_Rect roundedRect(double x, double y, int w, int h) {
+    return SDL_Rect{static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), w, h};
+}
+
+// True if the area overlaps a solid: an immovable Entity with the Collide property. Zones,
+// SpawnPoints and other players don't count.
+bool overlapsSolid(Game& game, const Entity& self, const SDL_Rect& area) {
+    for (const auto& [id, other] : game.getEntities()) {
+        if (id == self.getEntityID() || other->getisMovable()) continue;
+        if (!game.entityHasProperty(Property::Collide, id)) continue;
+        const SDL_Rect otherRect = other->getRect();
+        if (SDL_HasIntersection(&area, &otherRect)) return true;
+    }
+    return false;
+}
+
+// Keeps a w x h rectangle at (x, y) inside the bounds, if there are any
+void clampToBounds(const ControlAttribute& control, int w, int h, double& x, double& y) {
+    if (!control.getBounds()) return;
+    const SDL_Rect& b = *control.getBounds();
+    x = std::clamp(x, static_cast<double>(b.x), static_cast<double>(b.x + b.w - w));
+    y = std::clamp(y, static_cast<double>(b.y), static_cast<double>(b.y + b.h - h));
+}
+
+// Teleports the Entity DASH_DISTANCE towards the key, stopping at the bounds. Returns false,
+// leaving it where it is, if that spot is inside a solid or no different from where it is.
+bool tryDash(Entity& entity, Game& game, const ControlAttribute& control, SDL_Scancode key) {
+    double x = entity.getX();
+    double y = entity.getY();
+    switch (key) {
+        case SDL_SCANCODE_UP:
+            y -= ControlHandler::DASH_DISTANCE;
+            break;
+        case SDL_SCANCODE_DOWN:
+            y += ControlHandler::DASH_DISTANCE;
+            break;
+        case SDL_SCANCODE_LEFT:
+            x -= ControlHandler::DASH_DISTANCE;
+            break;
+        case SDL_SCANCODE_RIGHT:
+            x += ControlHandler::DASH_DISTANCE;
+            break;
+        default:
+            return false;
+    }
+    const SDL_Rect& rect = entity.getRect();
+    clampToBounds(control, rect.w, rect.h, x, y);
+    if (x == entity.getX() && y == entity.getY()) return false;
+    if (overlapsSolid(game, entity, roundedRect(x, y, rect.w, rect.h))) return false;
+
+    entity.setPosition(x, y);
+    return true;
+}
+
+// A direction key went down: two presses of the same key within the window dash
+void onDirectionPressed(Entity& entity, Game& game, ControlAttribute& control, SDL_Scancode key,
+                        int64_t now) {
+    const bool isDoubleTap = control.lastTapKey == key &&
+                             now - control.lastTapTime <= ControlHandler::DOUBLE_TAP_WINDOW;
+    control.lastTapKey = key;
+    control.lastTapTime = now;
+    if (!isDoubleTap) return;
+
+    // A third press starts a new double-tap rather than completing another one
+    control.lastTapKey.reset();
+    // A dash that fails doesn't start the cooldown
+    if (control.isDashReady(now) && tryDash(entity, game, control, key)) control.recordDash(now);
+}
+
+// Halves the Entity's size about its bottom centre, so its feet stay where they were
+void shrink(Entity& entity, ControlAttribute& control, int64_t now) {
+    const SDL_Rect rect = entity.getRect();
+    const int w = rect.w / 2;
+    const int h = rect.h / 2;
+    control.startShrink(now, rect.w, rect.h);
+    entity.setRectWidth(w);
+    entity.setRectHeight(h);
+    entity.setPosition(entity.getX() + (rect.w - w) / 2.0, entity.getY() + (rect.h - h));
+}
+
+// Grows the Entity back to full size with its feet where they are: about its bottom centre, or
+// keeping its right or left edge if that's the only way to fit. Returns false, leaving it
+// shrunk, if there's no room (e.g. under the low wall), so it never grows into a solid.
+bool tryGrow(Entity& entity, Game& game, const ControlAttribute& control) {
+    const SDL_Rect rect = entity.getRect();
+    const int w = control.getFullWidth();
+    const int h = control.getFullHeight();
+    const double y = entity.getY() - (h - rect.h);
+    const double candidates[] = {entity.getX() - (w - rect.w) / 2.0, entity.getX() - (w - rect.w),
+                                 entity.getX()};
+    for (double x : candidates) {
+        double fitX = x;
+        double fitY = y;
+        clampToBounds(control, w, h, fitX, fitY);
+        if (overlapsSolid(game, entity, roundedRect(fitX, fitY, w, h))) continue;
+        entity.setRectWidth(w);
+        entity.setRectHeight(h);
+        entity.setPosition(fitX, fitY);
+        return true;
+    }
+    return false;
+}
+
+// Holding S and H together shrinks the Entity for the shrink duration
+void updateShrink(Entity& entity, Game& game, ControlAttribute& control, const Keys& keys,
+                  int64_t now) {
+    if (control.isShrunk()) {
+        if (now - control.getShrinkStartTime() >= control.getShrinkDuration() &&
+            tryGrow(entity, game, control)) {
+            control.endShrink(now);
+        }
+    } else if (keys.held(SDL_SCANCODE_S) && keys.held(SDL_SCANCODE_H) &&
+               control.isShrinkReady(now)) {
+        shrink(entity, control, now);
+    }
+}
+
+}  // namespace
 
 void ControlHandler::onEvent(const Event& event) {
     if (event.type == EventType::CONTROL) {
@@ -19,22 +145,13 @@ void ControlHandler::updateGameState(Entity& entity, Game& game) {
     auto control = game.getAttribute<ControlAttribute>(Property::Control, entity.getEntityID());
     if (!control) return;
 
-    const int64_t elapsed_time = game.getTimeline()->getTime();
+    const int64_t now = game.getTimeline()->getTime();
+    const bool canUseAbilities = entity.getisMovable() && entity.getIsControllable();
 
-    // Movement and ability keys, tracked for double-tap sequences
-    const SDL_Scancode keysOfInterest[] = {SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_LEFT,
-                                           SDL_SCANCODE_RIGHT};
-
-    // Process key presses and releases
-    for (SDL_Scancode key : keysOfInterest) {
-        bool isPressed = keys.held(key);
-        bool wasPressed = previousKeyStates[key];
-
-        if (!wasPressed && isPressed) {
-            // Key was just pressed
-            keySequence.push_back({key, static_cast<Uint32>(elapsed_time)});
-            if (entity.getisMovable() && entity.getIsControllable())
-                checkForSequences(key, static_cast<Uint32>(elapsed_time), entity, game);
+    // Dash on a double-tap of a direction key, counting only the tick each key goes down
+    for (SDL_Scancode key : DIRECTION_KEYS) {
+        if (canUseAbilities && keys.held(key) && !control->previousKeys.held(key)) {
+            onDirectionPressed(entity, game, *control, key, now);
         }
     }
 
@@ -58,129 +175,8 @@ void ControlHandler::updateGameState(Entity& entity, Game& game) {
         entity.setVelocityY(velocityY);
     }
 
-    // Check for chords
-    checkForChords(keys, entity, game, static_cast<Uint32>(elapsed_time));
+    if (canUseAbilities) updateShrink(entity, game, *control, keys, now);
 
     // Remember this frame's keys for edge detection next frame
-    for (SDL_Scancode key : keysOfInterest) previousKeyStates[key] = keys.held(key);
-}
-
-// Helper function to check for chords (simultaneous key presses)
-void ControlHandler::checkForChords(const Keys& keys, Entity& entity, Game& game,
-                                    Uint32 timestamp) {
-    const Uint32 currentTime = timestamp;  // Timeline time
-
-    // pressing 'S' and 'H' together triggers the shrink mechanic
-    if (keys.held(SDL_SCANCODE_S) && keys.held(SDL_SCANCODE_H)) {
-        if (!isShrunk) {
-            // Shrink the entity
-            SDL_Rect rect = entity.getRect();
-            rect.w /= 2;  // Halve the width
-            rect.h /= 2;  // Halve the height
-            entity.setRect(rect);
-
-            isShrunk = true;
-            shrinkStartTime = currentTime;
-        }
-    }
-
-    // Check if shrink duration has passed
-    if (isShrunk && currentTime - shrinkStartTime >= 5000) {  // 5 seconds duration
-        // Restore original size
-        SDL_Rect rect = entity.getRect();
-        rect.w *= 2;  // Restore width
-        rect.h *= 2;  // Restore height
-        entity.setRect(rect);
-
-        isShrunk = false;
-    }
-
-    // Add more chords in future
-}
-
-// Helper function to check for sequences (specific key press patterns)
-void ControlHandler::checkForSequences(SDL_Scancode key, Uint32 timestamp, Entity& entity,
-                                       Game& game) {
-    // Define the direction keys
-    SDL_Scancode directionKeys[] = {SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_LEFT,
-                                    SDL_SCANCODE_RIGHT};
-
-    // Remove old entries from keySequence (older than SEQUENCE_TIMEOUT milliseconds)
-    const Uint32 SEQUENCE_TIMEOUT = 250;  // quarter of a second
-    while (!keySequence.empty() && (timestamp - keySequence.front().second) > SEQUENCE_TIMEOUT) {
-        keySequence.pop_front();
-    }
-
-    // Check if the last two key presses are the same direction key
-    if (keySequence.size() >= 2) {
-        auto it = keySequence.rbegin();
-        SDL_Scancode lastKey = it->first;
-        ++it;
-        SDL_Scancode secondLastKey = it->first;
-
-        // Check if both keys are the same and are direction keys
-        if (lastKey == secondLastKey) {
-            bool isDirectionKey = false;
-            for (SDL_Scancode dirKey : directionKeys) {
-                if (lastKey == dirKey) {
-                    isDirectionKey = true;
-                    break;
-                }
-            }
-            if (isDirectionKey) {
-                // Attempt to teleport the entity 200 pixels in the direction
-                int teleportDistance = 200;
-                int targetX = entity.getRect().x;
-                int targetY = entity.getRect().y;
-
-                switch (lastKey) {
-                    case SDL_SCANCODE_UP:
-                        targetY -= teleportDistance;
-                        break;
-                    case SDL_SCANCODE_DOWN:
-                        targetY += teleportDistance;
-                        break;
-                    case SDL_SCANCODE_LEFT:
-                        targetX -= teleportDistance;
-                        break;
-                    case SDL_SCANCODE_RIGHT:
-                        targetX += teleportDistance;
-                        break;
-                    default:
-                        break;
-                }
-
-                // Check if another entity is at the target position
-                SDL_Rect targetRect = entity.getRect();
-                targetRect.x = targetX;
-                targetRect.y = targetY;
-
-                bool positionOccupied = false;
-                const auto& entities = game.getEntities();  // Map of ID and std::shared_ptr<Entity>
-
-                for (const auto& pair : entities) {
-                    std::shared_ptr<Entity> otherEntityPtr = pair.second;
-                    if (otherEntityPtr.get() != &entity) {  // Don't compare with self
-                        SDL_Rect otherRect = otherEntityPtr->getRect();
-                        if (SDL_HasIntersection(&targetRect, &otherRect)) {
-                            positionOccupied = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!positionOccupied) {
-                    // Teleport the entity
-                    entity.setRectX(targetX);
-                    entity.setRectY(targetY);
-                } else {
-                    // Cannot teleport because position is occupied
-                    // Optional: Provide feedback to the player
-                }
-
-                // Clear the key sequence to prevent immediate retriggering
-                keySequence.clear();
-            }
-        }
-    }
+    control->previousKeys = keys;
 }

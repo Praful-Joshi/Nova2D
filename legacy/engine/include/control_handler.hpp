@@ -4,28 +4,21 @@
 #include "eventmanager.hpp"
 #include "game.hpp"
 
+// Turns the held keys into running, jumping, dashing and shrinking. One handler serves every
+// controlled Entity, so it keeps no state: each Entity's input state lives on its ControlAttribute.
 class ControlHandler : public EventHandler {
 public:
     ControlHandler() = default;
     ~ControlHandler() override = default;
     void onEvent(const Event& event) override;
 
+    // Two presses of the same direction key at most this far apart (Timeline units) dash
+    static constexpr int64_t DOUBLE_TAP_WINDOW = 250;
+    // How far a dash teleports, in pixels
+    static constexpr int DASH_DISTANCE = 200;
+
 private:
-    void updateGameState(Entity& entity, Game& game);
-
-    // New member variables
-    bool previousKeyStates[SDL_NUM_SCANCODES] = {};  // To store previous key states
-    std::deque<std::pair<SDL_Scancode, Uint32>>
-        keySequence;  // To store key presses with timestamps
-
-    // Variables for the shrink mechanic
-    bool isShrunk = false;
-    Uint32 shrinkStartTime = 0;
-
-    // Helper functions for chord and sequence detection
-    void checkForChords(const Keys& keys, Entity& entity, Game& game,
-                        Uint32 timestamp);
-    void checkForSequences(SDL_Scancode key, Uint32 timestamp, Entity& entity, Game& game);
+    static void updateGameState(Entity& entity, Game& game);
 };
 
 #endif
