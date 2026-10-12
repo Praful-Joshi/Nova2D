@@ -5,6 +5,9 @@
     "sdl2",
     "sdl2-image",
     "spdlog",
-    "catch2"
+    "catch2",
+    "zeromq",
+    "cppzmq",
+    "boost-property-tree"
   ]
 }

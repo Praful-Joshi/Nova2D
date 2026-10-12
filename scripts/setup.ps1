@@ -32,6 +32,7 @@ if (-not (Test-Path "$vcpkgDir\vcpkg.exe")) {
 }
 
 # ── Install deps via vcpkg using our manifest ─────────────────────────────────
+# Includes the Legacy Engine's ZeroMQ, cppzmq and Boost property_tree.
 Info "Installing dependencies via vcpkg manifest (vcpkg.json)..."
 $repoRoot = Split-Path $PSScriptRoot -Parent
 & "$vcpkgDir\vcpkg.exe" install `
