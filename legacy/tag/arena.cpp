@@ -6,6 +6,7 @@
 #include "gravity.hpp"
 #include "movement.hpp"
 #include "platform.hpp"
+#include "sideboundary.hpp"
 #include "spawnpoint.hpp"
 
 namespace arena {
@@ -54,6 +55,14 @@ void addPitDeathZone(Game& game, int id, int left, int right) {
     game.addEntity(zone);
     game.addProperty(Property::DeathZone, id,
                      std::make_shared<DeathZoneAttribute>(spawnPointId(1), RESPAWN_DELAY));
+}
+
+// A SideBoundary zone's position is in screen space, not World Coordinates
+void addSideBoundary(Game& game, int id, int screenX, bool isLeft) {
+    auto zone = std::make_shared<Entity>(screenX, 0, SIDE_ZONE_WIDTH, HEIGHT,
+                                         SDL_Color{0, 0, 0, 0}, 0, 0, false, false, false, id, 0);
+    game.addEntity(zone);
+    game.addProperty(Property::SideBoundary, id, std::make_shared<SideBoundaryAttribute>(isLeft));
 }
 
 }  // namespace
@@ -107,6 +116,12 @@ void build(Game& game) {
     // Falling into a pit respawns only that player, at their own SpawnPoint
     addPitDeathZone(game, PIT1_DEATHZONE_ID, PIT1_LEFT, PIT1_RIGHT);
     addPitDeathZone(game, PIT2_DEATHZONE_ID, PIT2_LEFT, PIT2_RIGHT);
+
+    // SideBoundary zones at the screen edges scroll the Camera across the arena
+    game.getCamera().setWorldSize(WIDTH, HEIGHT);
+    const int viewWidth = game.getCamera().getViewWidth();
+    addSideBoundary(game, LEFT_SIDE_ZONE_ID, 0, true);
+    addSideBoundary(game, RIGHT_SIDE_ZONE_ID, viewWidth - SIDE_ZONE_WIDTH, false);
 }
 
 std::shared_ptr<Entity> addPlayer(Game& game, int peerId, bool isLocal) {

@@ -24,6 +24,7 @@
 #include <unordered_map>
 
 #include "attribute.hpp"
+#include "camera.hpp"
 #include "collisions.hpp"
 #include "control.hpp"
 #include "gravity.hpp"
@@ -38,7 +39,7 @@ class Game {
 public:
     Game(int control, double gravity, int curW, int curH, int ClientID, bool useEfficientComm,
          int noplayersJoining)
-        : ClientID(ClientID) {
+        : ClientID(ClientID), camera(curW, curH) {
         controllableSpeed = control;
         gravityStrength = gravity;
         cur_w = curW;
@@ -83,6 +84,10 @@ public:
 
     int getCurrentHeight() const { return cur_h; }
     void setCurrentHeight(int height) { cur_h = height; }
+
+    // This Peer's view into the world; its view size is the design window size
+    Camera& getCamera() { return camera; }
+    const Camera& getCamera() const { return camera; }
 
     Timeline* getTimeline() const { return timeline; }
     void setTimeline(Timeline& gameTimeline) { timeline = &gameTimeline; }
@@ -172,6 +177,8 @@ private:
     Timeline* timeline = nullptr;
 
     bool isProportionalScaling = false;  // Track current scaling mode
+
+    Camera camera;
 
     // Current scaling mode
     // ScalingMode scalingMode = ScalingMode::ConstantSize;

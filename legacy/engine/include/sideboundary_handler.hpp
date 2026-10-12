@@ -4,6 +4,9 @@
 #include "eventmanager.hpp"
 #include "game.hpp"
 
+// Scrolls the Camera when the local (controllable) player enters a SideBoundary zone. The zone's
+// rect is in screen space, so it is compared against the player's screen position (World
+// Coordinates minus the Camera). Entities never move.
 class SideBoundaryHandler : public EventHandler {
 public:
     SideBoundaryHandler() = default;
@@ -11,8 +14,8 @@ public:
     void onEvent(const Event& event) override;
 
 private:
-    void updateGameState(Entity& entity, Game& game);
-    bool isLeftBoundary;
+    void updateGameState(Entity& zone, Game& game);
+    bool isLeftBoundary = false;
 };
 
 #endif

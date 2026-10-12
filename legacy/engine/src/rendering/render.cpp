@@ -1,5 +1,7 @@
 #include "render.hpp"
 
+#include <cmath>
+
 
 /**
  *   Clears the screen and sets draw color to blue
@@ -23,6 +25,11 @@ void renderEntities(SDL_Renderer* renderer, Game& game) {
             continue;  // Skip rendering death zones and spawn points
         }
         SDL_Rect scaledRect = entityPtr->getRect();  // Access the rectangle for the entity
+
+        // World Coordinates to screen: draw relative to this Peer's Camera
+        const Camera& camera = game.getCamera();
+        scaledRect.x = static_cast<int>(std::lround(entityPtr->getX() - camera.getX()));
+        scaledRect.y = static_cast<int>(std::lround(entityPtr->getY() - camera.getY()));
 
         // Scale from the design size to the current window size if enabled
         if (game.getIsProportionalScaling()) {

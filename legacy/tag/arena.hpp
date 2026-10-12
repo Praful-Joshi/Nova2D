@@ -44,6 +44,10 @@ constexpr int GAP_WALL_X = 1460;
 constexpr int GAP_WALL_WIDTH = 40;
 constexpr int GAP_HEIGHT = 30;
 
+// Width of the SideBoundary zones at the left and right edges of the screen (screen space):
+// the Camera scrolls to keep the local player at least this far from either edge
+constexpr int SIDE_ZONE_WIDTH = 300;
+
 // Entity IDs of the arena's moving platforms
 constexpr int PLATFORM1_ID = 10;
 constexpr int PLATFORM2_ID = 11;
@@ -53,6 +57,8 @@ constexpr int ELEVATOR_ID = 12;
 // falls in stays out of the world before respawning at their SpawnPoint
 constexpr int PIT1_DEATHZONE_ID = 50;
 constexpr int PIT2_DEATHZONE_ID = 51;
+constexpr int LEFT_SIDE_ZONE_ID = 60;
+constexpr int RIGHT_SIDE_ZONE_ID = 61;
 constexpr int64_t RESPAWN_DELAY = 1000;
 
 // Entity ID of the player owned by the given Peer

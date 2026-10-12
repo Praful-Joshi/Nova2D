@@ -10,37 +10,28 @@ void SideBoundaryHandler::onEvent(const Event& event) {
     }
 }
 
-void SideBoundaryHandler::updateGameState(Entity& entity, Game& game) {
-    int scrollAmount = isLeftBoundary ? 10 : -10;
+void SideBoundaryHandler::updateGameState(Entity& zone, Game& game) {
+    if (!game.entityHasProperty(Property::SideBoundary, zone.getEntityID())) return;
 
-    auto entities = game.getEntities();
+    Camera& camera = game.getCamera();
+    const SDL_Rect& zoneRect = zone.getRect();
 
-    for (const auto& [id, otherEntity] : entities) {
-        // Skip checking itself
-        if (entity.getEntityID() == id) {
-            continue;
-        }
+    for (const auto& [id, entity] : game.getEntities()) {
+        // Only the local player scrolls this Peer's Camera
+        if (!game.entityHasProperty(Property::Control, id)) continue;
 
-        // Check if this entity is a death zone
-        if (!game.entityHasProperty(Property::SideBoundary, entity.getEntityID())) {
-            continue;
-        }
+        // The player's left and right edges on screen
+        const double left = entity->getX() - camera.getX();
+        const double right = left + entity->getRect().w;
 
-        // Check for collision
-        if (SDL_HasIntersection(&entity.getRect(), &otherEntity->getRect())) {
-            // Check if the other entity has the Control property (only teleport control entities)
-            if (!game.entityHasProperty(Property::Control, otherEntity->getEntityID())) {
-                continue;
-            }
-            // Scroll all entities horizontally by scrollAmount
-            for (auto& [entityId, gameEntity] : entities) {
-                if (gameEntity->getEntityID() != entity.getEntityID() &&
-                    !game.entityHasProperty(Property::SideBoundary, gameEntity->getEntityID())) {
-                    gameEntity->setRectX(gameEntity->getRect().x + scrollAmount);
-                }
-            }
-
-            return;
+        // Scroll just enough to keep the player at the zone's inner edge, so the view follows
+        // the player smoothly at the player's own speed
+        if (isLeftBoundary) {
+            const double innerEdge = zoneRect.x + zoneRect.w;
+            if (left < innerEdge) camera.scrollBy(left - innerEdge, 0);
+        } else {
+            const double innerEdge = zoneRect.x;
+            if (right > innerEdge) camera.scrollBy(right - innerEdge, 0);
         }
     }
 }
