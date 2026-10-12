@@ -11,6 +11,19 @@
 namespace {
 constexpr double GRAVITY = 0.002;  // pixels per Timeline unit squared
 constexpr int CONTROL_SPEED = 3;
+
+TimelineState timelineState(Timeline& timeline) {
+    return TimelineState{timeline.isPaused(), timeline.getTic()};
+}
+
+void applyTimelineState(Timeline& timeline, const TimelineState& state) {
+    if (timeline.getTic() != state.tic) timeline.changeTic(state.tic);
+    if (state.paused) {
+        timeline.pause();
+    } else {
+        timeline.unpause();
+    }
+}
 }  // namespace
 
 std::string TagConfig::peerAddress(int otherPeerId) const {
@@ -87,6 +100,8 @@ void TagPeer::handleMessage(const Message& message) {
 
     if (const auto* state = std::get_if<HostState>(&message.body)) {
         followHost(*state);
+    } else if (const auto* timeline = std::get_if<TimelineState>(&message.body)) {
+        applyTimelineState(timeline_, *timeline);
     } else if (const auto* start = std::get_if<RoundStart>(&message.body)) {
         if (rounds_.compare(start->round, RoundPhase::COUNTDOWN) > 0) {
             raiseRoundEvent(ROUND_START, start->round, start->participants);
@@ -144,6 +159,7 @@ void TagPeer::sendHostStateDue() {
     state.remainingMs = rounds_.remainingMs();
     state.round = rounds_.round();
     state.participants = rounds_.participants();
+    state.timeline = timelineState(timeline_);
     for (const auto& [id, entity] : game_.getEntities()) {
         if (auto* platform = dynamic_cast<Platform*>(entity.get())) {
             state.platforms.push_back(PlatformState{id, platform->getX(), platform->getY(),
@@ -157,6 +173,7 @@ void TagPeer::sendHostStateDue() {
 }
 
 void TagPeer::followHost(const HostState& state) {
+    applyTimelineState(timeline_, state.timeline);
     for (const PlatformState& platformState : state.platforms) {
         auto platform = std::dynamic_pointer_cast<Platform>(game_.getEntity(platformState.id));
         if (!platform) continue;
@@ -231,16 +248,16 @@ bool TagPeer::pressed(const Keys& keys, SDL_Scancode key) const {
 void TagPeer::handlePeerKeys(const Keys& keys) {
     if (pressed(keys, SDL_SCANCODE_T)) game_.toggleScalingMode();
 
-    if (pressed(keys, SDL_SCANCODE_P)) {
-        if (timeline_.isPaused()) {
-            timeline_.unpause();
-        } else {
-            timeline_.pause();
-        }
-    }
-    if (pressed(keys, SDL_SCANCODE_1)) timeline_.changeTic(500'000);    // 2x speed
-    if (pressed(keys, SDL_SCANCODE_2)) timeline_.changeTic(1'000'000);  // normal speed
-    if (pressed(keys, SDL_SCANCODE_3)) timeline_.changeTic(2'000'000);  // 0.5x speed
+    // Pause and speed are the Host's to set: it applies them and tells every Peer
+    if (!isHost()) return;
+    TimelineState state = timelineState(timeline_);
+    if (pressed(keys, SDL_SCANCODE_P)) state.paused = !state.paused;
+    if (pressed(keys, SDL_SCANCODE_1)) state.tic = 500'000;    // 2x speed
+    if (pressed(keys, SDL_SCANCODE_2)) state.tic = 1'000'000;  // normal speed
+    if (pressed(keys, SDL_SCANCODE_3)) state.tic = 2'000'000;  // 0.5x speed
+    if (state == timelineState(timeline_)) return;
+    applyTimelineState(timeline_, state);
+    network_.send(state);
 }
 
 std::shared_ptr<Entity> TagPeer::localPlayer() {

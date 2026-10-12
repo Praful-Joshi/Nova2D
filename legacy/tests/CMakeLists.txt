@@ -4,6 +4,7 @@ add_executable(nova2d_legacy_tests
     test_change_only.cpp
     test_deathzone.cpp
     test_events.cpp
+    test_host_timeline.cpp
     test_messages.cpp
     test_network.cpp
     test_physics.cpp

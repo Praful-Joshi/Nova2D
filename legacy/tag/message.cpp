@@ -19,6 +19,7 @@ constexpr std::array<const char*, std::variant_size_v<MessageBody>> TYPE_NAMES =
     "HOST_STATE",
     "ROUND_START",
     "ROUND_END",
+    "TIMELINE",
 };
 
 constexpr std::array<const char*, 4> PHASE_NAMES = {"LOBBY", "COUNTDOWN", "PLAYING", "RESULTS"};
@@ -46,6 +47,11 @@ void writeBody(pt::ptree& tree, const PlayerState& state) {
     tree.put("active", state.active);
 }
 
+void writeBody(pt::ptree& tree, const TimelineState& timeline) {
+    tree.put("paused", timeline.paused);
+    tree.put("tic", timeline.tic);
+}
+
 void writeBody(pt::ptree& tree, const HostState& state) {
     tree.put("phase", PHASE_NAMES[static_cast<std::size_t>(state.phase)]);
     tree.put("remainingMs", state.remainingMs);
@@ -62,6 +68,9 @@ void writeBody(pt::ptree& tree, const HostState& state) {
         platforms.push_back({"", item});
     }
     tree.add_child("platforms", platforms);
+    pt::ptree timeline;
+    writeBody(timeline, state.timeline);
+    tree.add_child("timeline", timeline);
 }
 void writeBody(pt::ptree& tree, const RoundStart& start) {
     tree.put("round", start.round);
@@ -132,6 +141,13 @@ std::optional<PlatformState> readPlatform(const pt::ptree& tree) {
     return PlatformState{*id, *x, *y, *directionX, *directionY};
 }
 
+std::optional<TimelineState> readTimeline(const pt::ptree& tree) {
+    auto paused = tree.get_optional<bool>("paused");
+    auto tic = tree.get_optional<int64_t>("tic");
+    if (!paused || !tic || *tic < 1) return std::nullopt;
+    return TimelineState{*paused, *tic};
+}
+
 std::optional<MessageBody> readHostState(const pt::ptree& tree) {
     HostState state;
     auto phase = readPhase(tree);
@@ -139,7 +155,11 @@ std::optional<MessageBody> readHostState(const pt::ptree& tree) {
     auto round = tree.get_optional<int>("round");
     auto participants = readPeerIds(tree, "participants");
     auto platforms = tree.get_child_optional("platforms");
-    if (!phase || !remainingMs || !round || !participants || !platforms) return std::nullopt;
+    auto timelineTree = tree.get_child_optional("timeline");
+    auto timeline = timelineTree ? readTimeline(*timelineTree) : std::nullopt;
+    if (!phase || !remainingMs || !round || !participants || !platforms || !timeline) {
+        return std::nullopt;
+    }
     state.phase = *phase;
     state.remainingMs = *remainingMs;
     state.round = *round;
@@ -149,6 +169,7 @@ std::optional<MessageBody> readHostState(const pt::ptree& tree) {
         if (!name.empty() || !platform) return std::nullopt;
         state.platforms.push_back(*platform);
     }
+    state.timeline = *timeline;
     return state;
 }
 
@@ -179,6 +200,9 @@ std::optional<MessageBody> readBody(MessageType type, const pt::ptree& tree) {
             return readRoundStart(tree);
         case MessageType::ROUND_END:
             return readRoundEnd(tree);
+        case MessageType::TIMELINE:
+            if (auto timeline = readTimeline(tree)) return MessageBody{*timeline};
+            return std::nullopt;
     }
     return std::nullopt;
 }

@@ -57,6 +57,17 @@ struct PlatformState {
     }
 };
 
+// The Host's Timeline pause and speed, which every Peer applies to its own Timeline. Sent as
+// TIMELINE when the Host changes it, and in every HOST_STATE so later joiners pick it up.
+struct TimelineState {
+    bool paused = false;
+    int64_t tic = 1'000'000;  // nanoseconds per Timeline unit: 500'000 is 2x speed
+
+    bool operator==(const TimelineState& other) const {
+        return paused == other.paused && tic == other.tic;
+    }
+};
+
 // The shared state the Host has authority over, broadcast regularly
 struct HostState {
     RoundPhase phase = RoundPhase::LOBBY;
@@ -64,11 +75,12 @@ struct HostState {
     int round = 0;
     std::vector<int> participants;  // Peer IDs playing this Round; others are Spectators
     std::vector<PlatformState> platforms;
+    TimelineState timeline;
 
     bool operator==(const HostState& other) const {
         return phase == other.phase && remainingMs == other.remainingMs &&
                round == other.round && participants == other.participants &&
-               platforms == other.platforms;
+               platforms == other.platforms && timeline == other.timeline;
     }
 };
 
@@ -89,11 +101,19 @@ struct RoundEnd {
     bool operator==(const RoundEnd& other) const { return round == other.round; }
 };
 
-using MessageBody =
-    std::variant<Heartbeat, PlayerState, Leaving, HostState, RoundStart, RoundEnd>;
+using MessageBody = std::variant<Heartbeat, PlayerState, Leaving, HostState, RoundStart, RoundEnd,
+                                 TimelineState>;
 
 // In the same order as MessageBody's alternatives
-enum class MessageType { HEARTBEAT, PLAYER_STATE, LEAVING, HOST_STATE, ROUND_START, ROUND_END };
+enum class MessageType {
+    HEARTBEAT,
+    PLAYER_STATE,
+    LEAVING,
+    HOST_STATE,
+    ROUND_START,
+    ROUND_END,
+    TIMELINE,
+};
 
 struct Message {
     int sender = 0;  // Peer ID, from 1
