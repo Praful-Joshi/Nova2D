@@ -1,5 +1,6 @@
 add_executable(nova2d_legacy_tests
     test_physics.cpp
+    test_text.cpp
 )
 
 target_link_libraries(nova2d_legacy_tests

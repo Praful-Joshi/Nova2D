@@ -20,6 +20,7 @@ add_library(nova2d_legacy_engine STATIC
     src/networking/peer.cpp
     src/rendering/render.cpp
     src/rendering/scaling.cpp
+    src/rendering/text.cpp
 )
 
 target_include_directories(nova2d_legacy_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")

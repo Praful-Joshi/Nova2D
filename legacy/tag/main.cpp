@@ -7,6 +7,7 @@
 #include "render.hpp"
 #include "scaling.hpp"
 #include "tag_peer.hpp"
+#include "text.hpp"
 
 namespace {
 
@@ -63,6 +64,9 @@ int main(int argc, char* argv[]) {
 
         clearScreen(renderer);
         renderEntities(renderer, peer.game());
+        // HUD placeholder, in screen space
+        drawText(renderer, "TAG", 16, 16, 4, SDL_Color{255, 255, 255, 255});
+        drawText(renderer, "NOVA2D LEGACY ENGINE", 16, 52, 2, SDL_Color{255, 255, 255, 255});
         if (screenshotPath != nullptr && ++frame == 60) {
             saveFrame(renderer, screenshotPath);
             quit = true;
