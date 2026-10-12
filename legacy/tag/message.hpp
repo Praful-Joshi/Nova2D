@@ -68,6 +68,16 @@ struct TimelineState {
     }
 };
 
+// One player's total time as It in the current Round, in Timeline ms
+struct ItTime {
+    int peerId = 0;
+    int64_t ms = 0;
+
+    bool operator==(const ItTime& other) const {
+        return peerId == other.peerId && ms == other.ms;
+    }
+};
+
 // The shared state the Host has authority over, broadcast regularly
 struct HostState {
     RoundPhase phase = RoundPhase::LOBBY;
@@ -76,33 +86,52 @@ struct HostState {
     std::vector<int> participants;  // Peer IDs playing this Round; others are Spectators
     std::vector<PlatformState> platforms;
     TimelineState timeline;
+    int it = 0;                   // Peer ID of It; 0 if nobody is
+    int64_t itFrozenMs = 0;       // Timeline time It stays frozen for
+    int immune = 0;               // Peer ID with Tag-back Immunity against It; 0 if nobody
+    int64_t immuneMs = 0;         // Timeline time the immunity lasts for
+    std::vector<ItTime> itTimes;  // each participant's It time so far
 
     bool operator==(const HostState& other) const {
         return phase == other.phase && remainingMs == other.remainingMs &&
                round == other.round && participants == other.participants &&
-               platforms == other.platforms && timeline == other.timeline;
+               platforms == other.platforms && timeline == other.timeline &&
+               it == other.it && itFrozenMs == other.itFrozenMs && immune == other.immune &&
+               immuneMs == other.immuneMs && itTimes == other.itTimes;
     }
 };
 
-// The Host starts a Round's Countdown with these players
+// The Host starts a Round's Countdown with these players, and the one who starts as It
 struct RoundStart {
     int round = 0;
     std::vector<int> participants;
+    int it = 0;
 
     bool operator==(const RoundStart& other) const {
-        return round == other.round && participants == other.participants;
+        return round == other.round && participants == other.participants && it == other.it;
     }
 };
 
-// The Host ends a Round
+// The Host ends a Round, with each participant's final It time
 struct RoundEnd {
     int round = 0;
+    std::vector<ItTime> itTimes;
 
-    bool operator==(const RoundEnd& other) const { return round == other.round; }
+    bool operator==(const RoundEnd& other) const {
+        return round == other.round && itTimes == other.itTimes;
+    }
+};
+
+// The Host decided a Tagging: It (from) touched a player (to), who is now It
+struct Tagged {
+    int from = 0;
+    int to = 0;
+
+    bool operator==(const Tagged& other) const { return from == other.from && to == other.to; }
 };
 
 using MessageBody = std::variant<Heartbeat, PlayerState, Leaving, HostState, RoundStart, RoundEnd,
-                                 TimelineState>;
+                                 TimelineState, Tagged>;
 
 // In the same order as MessageBody's alternatives
 enum class MessageType {
@@ -113,6 +142,7 @@ enum class MessageType {
     ROUND_START,
     ROUND_END,
     TIMELINE,
+    TAGGED,
 };
 
 struct Message {

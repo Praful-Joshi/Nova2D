@@ -20,6 +20,7 @@ constexpr std::array<const char*, std::variant_size_v<MessageBody>> TYPE_NAMES =
     "ROUND_START",
     "ROUND_END",
     "TIMELINE",
+    "TAGGED",
 };
 
 constexpr std::array<const char*, 4> PHASE_NAMES = {"LOBBY", "COUNTDOWN", "PLAYING", "RESULTS"};
@@ -32,6 +33,17 @@ void writePeerIds(pt::ptree& tree, const char* key, const std::vector<int>& ids)
         list.push_back({"", item});
     }
     tree.add_child(key, list);
+}
+
+void writeItTimes(pt::ptree& tree, const std::vector<ItTime>& itTimes) {
+    pt::ptree list;
+    for (const ItTime& itTime : itTimes) {
+        pt::ptree item;
+        item.put("peerId", itTime.peerId);
+        item.put("ms", itTime.ms);
+        list.push_back({"", item});
+    }
+    tree.add_child("itTimes", list);
 }
 
 // Writers: put a body's fields into the message's JSON object
@@ -71,12 +83,25 @@ void writeBody(pt::ptree& tree, const HostState& state) {
     pt::ptree timeline;
     writeBody(timeline, state.timeline);
     tree.add_child("timeline", timeline);
+    tree.put("it", state.it);
+    tree.put("itFrozenMs", state.itFrozenMs);
+    tree.put("immune", state.immune);
+    tree.put("immuneMs", state.immuneMs);
+    writeItTimes(tree, state.itTimes);
 }
 void writeBody(pt::ptree& tree, const RoundStart& start) {
     tree.put("round", start.round);
     writePeerIds(tree, "participants", start.participants);
+    tree.put("it", start.it);
 }
-void writeBody(pt::ptree& tree, const RoundEnd& end) { tree.put("round", end.round); }
+void writeBody(pt::ptree& tree, const RoundEnd& end) {
+    tree.put("round", end.round);
+    writeItTimes(tree, end.itTimes);
+}
+void writeBody(pt::ptree& tree, const Tagged& tagged) {
+    tree.put("from", tagged.from);
+    tree.put("to", tagged.to);
+}
 
 // Readers: a body from the JSON object, or nothing if a field is missing or ill-typed
 std::optional<double> readFinite(const pt::ptree& tree, const char* key) {
@@ -122,6 +147,37 @@ std::optional<std::vector<int>> readPeerIds(const pt::ptree& tree, const char* k
     return ids;
 }
 
+std::optional<int> readPeerId(const pt::ptree& tree, const char* key) {
+    auto node = tree.get_child_optional(key);
+    return node ? readPeerId(*node) : std::nullopt;
+}
+
+// A Peer ID, or 0 for nobody
+std::optional<int> readOptionalPeerId(const pt::ptree& tree, const char* key) {
+    auto id = tree.get_optional<int>(key);
+    if (!id || *id < 0) return std::nullopt;
+    return *id;
+}
+
+std::optional<int64_t> readDuration(const pt::ptree& tree, const char* key) {
+    auto ms = tree.get_optional<int64_t>(key);
+    if (!ms || *ms < 0) return std::nullopt;
+    return *ms;
+}
+
+std::optional<std::vector<ItTime>> readItTimes(const pt::ptree& tree) {
+    auto list = tree.get_child_optional("itTimes");
+    if (!list) return std::nullopt;
+    std::vector<ItTime> itTimes;
+    for (const auto& [name, item] : *list) {
+        auto peerId = readPeerId(item, "peerId");
+        auto ms = readDuration(item, "ms");
+        if (!name.empty() || !peerId || !ms) return std::nullopt;
+        itTimes.push_back(ItTime{*peerId, *ms});
+    }
+    return itTimes;
+}
+
 std::optional<RoundPhase> readPhase(const pt::ptree& tree) {
     auto name = tree.get_optional<std::string>("phase");
     if (!name) return std::nullopt;
@@ -157,7 +213,13 @@ std::optional<MessageBody> readHostState(const pt::ptree& tree) {
     auto platforms = tree.get_child_optional("platforms");
     auto timelineTree = tree.get_child_optional("timeline");
     auto timeline = timelineTree ? readTimeline(*timelineTree) : std::nullopt;
-    if (!phase || !remainingMs || !round || !participants || !platforms || !timeline) {
+    auto it = readOptionalPeerId(tree, "it");
+    auto itFrozenMs = readDuration(tree, "itFrozenMs");
+    auto immune = readOptionalPeerId(tree, "immune");
+    auto immuneMs = readDuration(tree, "immuneMs");
+    auto itTimes = readItTimes(tree);
+    if (!phase || !remainingMs || !round || !participants || !platforms || !timeline || !it ||
+        !itFrozenMs || !immune || !immuneMs || !itTimes) {
         return std::nullopt;
     }
     state.phase = *phase;
@@ -170,20 +232,34 @@ std::optional<MessageBody> readHostState(const pt::ptree& tree) {
         state.platforms.push_back(*platform);
     }
     state.timeline = *timeline;
+    state.it = *it;
+    state.itFrozenMs = *itFrozenMs;
+    state.immune = *immune;
+    state.immuneMs = *immuneMs;
+    state.itTimes = *itTimes;
     return state;
 }
 
 std::optional<MessageBody> readRoundStart(const pt::ptree& tree) {
     auto round = tree.get_optional<int>("round");
     auto participants = readPeerIds(tree, "participants");
-    if (!round || !participants) return std::nullopt;
-    return RoundStart{*round, *participants};
+    auto it = readOptionalPeerId(tree, "it");
+    if (!round || !participants || !it) return std::nullopt;
+    return RoundStart{*round, *participants, *it};
 }
 
 std::optional<MessageBody> readRoundEnd(const pt::ptree& tree) {
     auto round = tree.get_optional<int>("round");
-    if (!round) return std::nullopt;
-    return RoundEnd{*round};
+    auto itTimes = readItTimes(tree);
+    if (!round || !itTimes) return std::nullopt;
+    return RoundEnd{*round, *itTimes};
+}
+
+std::optional<MessageBody> readTagged(const pt::ptree& tree) {
+    auto from = readPeerId(tree, "from");
+    auto to = readPeerId(tree, "to");
+    if (!from || !to) return std::nullopt;
+    return Tagged{*from, *to};
 }
 
 std::optional<MessageBody> readBody(MessageType type, const pt::ptree& tree) {
@@ -203,6 +279,8 @@ std::optional<MessageBody> readBody(MessageType type, const pt::ptree& tree) {
         case MessageType::TIMELINE:
             if (auto timeline = readTimeline(tree)) return MessageBody{*timeline};
             return std::nullopt;
+        case MessageType::TAGGED:
+            return readTagged(tree);
     }
     return std::nullopt;
 }
